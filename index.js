@@ -42,10 +42,11 @@
     }
   }
 
-  class AddNode {
+  class IntegerAddNode {
     constructor(a, b) {
       this.a = a;
       this.b = b;
+      this.type = "Integer";
     }
 
     simulate() {
@@ -53,10 +54,11 @@
     }
   }
 
-  class SubNode {
+  class IntegerSubNode {
     constructor(a, b) {
       this.a = a;
       this.b = b;
+      this.type = "Integer";
     }
 
     simulate() {
@@ -64,10 +66,11 @@
     }
   }
 
-  class MulNode {
+  class IntegerMulNode {
     constructor(a, b) {
       this.a = a;
       this.b = b;
+      this.type = "Integer";
     }
 
     simulate() {
@@ -75,30 +78,35 @@
     }
   }
 
-  class DivNode {
+  class IntegerDivNode {
     constructor(a, b) {
       this.a = a;
       this.b = b;
+      // TODO type is Real???
+      this.type = "Integer";
     }
 
     simulate() {
-      return this.a.simulate() / this.b.simulate();
+      // TODO return a float?
+      return Math.floor(this.a.simulate() / this.b.simulate());
     }
   }
 
-  class NumberNode {
-    constructor(n) {
-      this.n = n
+  class IntegerLiteralNode {
+    constructor(integer) {
+      this.integer = integer
+      this.type = "Integer";
     }
 
     simulate() {
-      return this.n;
+      return this.integer;
     }
   }
 
   class VariableNode {
     constructor(variable) {
       this.variable = variable;
+      this.type = this.variable.type;
     }
 
     simulate() {
@@ -197,52 +205,73 @@
       if(token.type === "end") return new NoOpNode();
 
       const varName = this.lexer.consume("ID");
-      this.lexer.consume("ASSIGN");
+      const assign = this.lexer.consume("ASSIGN");
       const expression = this.expression(symTable);
 
-      if(!symTable[varName.val]) throw(`Variable ${varName.val} doesn't exist! At line ${varName.line}, col ${varName.col}`);
+      const variable = symTable[varName.val];
+      if(!variable) throw(`Variable ${varName.val} doesn't exist! At line ${varName.line}, col ${varName.col}`);
+
+      if(variable.type !== "Integer" || expression.type !== "Integer") {
+        throw(`Incompatible types ${variable.type} and ${expression.type} at line ${assign.line}, col ${assign.col}`);
+      }
 
       return new AssignmentNode(symTable[varName.val], expression);
     }
 
     expression(symTable) {
-      let res = this.factor(symTable);
+      let left = this.factor(symTable);
 
       while(true) {
         const token = this.lexer.peek();
 
         if(token.type === "ADD") {
           this.lexer.consume("ADD");
-          res = new AddNode(res, this.factor(symTable));
+          const right = this.factor(symTable);
+          if(left.type !== "Integer" || right.type !== "Integer") {
+            throw(`Incompatible types for addition ${left.type} and ${right.type} at line ${token.line}, col ${token.col}`);
+          }
+          left = new IntegerAddNode(left, right);
         } else if(token.type === "SUB") {
           this.lexer.consume("SUB");
-          res = new SubNode(res, this.factor(symTable));
+          const right = this.factor(symTable);
+          if(left.type !== "Integer" || right.type !== "Integer") {
+            throw(`Incompatible types for substraction ${left.type} and ${right.type} at line ${token.line}, col ${token.col}`);
+          }
+          left = new IntegerSubNode(left, right);
         } else {
           break;
         }
       }
 
-      return res;
+      return left;
     }
 
     factor(symTable) {
-      let res = this.term(symTable);
+      let left = this.term(symTable);
 
       while(true) {
         const token = this.lexer.peek();
 
         if(token.type === "MUL") {
           this.lexer.consume("MUL");
-          res = new MulNode(res, this.term(symTable));
+          const right = this.term(symTable);
+          if(left.type !== "Integer" || right.type !== "Integer") {
+            throw(`Incompatible types for multiplication ${left.type} and ${right.type} at line ${token.line}, col ${token.col}`);
+          }
+          left = new IntegerMulNode(left, right);
         } else if(token.type === "DIV") {
           this.lexer.consume("DIV");
-          res = new DivNode(res, this.term(symTable));
+          const right = this.term(symTable);
+          if(left.type !== "Integer" || right.type !== "Integer") {
+            throw(`Incompatible types for division ${left.type} and ${right.type} at line ${token.line}, col ${token.col}`);
+          }
+          left = new IntegerDivNode(left, right);
         } else {
           break;
         }
       }
 
-      return res;
+      return left;
     }
 
     term(symTable) {
@@ -250,7 +279,7 @@
 
       if(token.type === "INTEGER_LITERAL") {
         this.lexer.consume("INTEGER_LITERAL");
-        return new NumberNode(parseInt(token.val));
+        return new IntegerLiteralNode(parseInt(token.val));
       } else if(token.type === "ID") {
         if(!symTable[token.val]) throw(`Variable ${token.val} doesn't exist! At line ${token.line}, col ${token.col}`);
 
