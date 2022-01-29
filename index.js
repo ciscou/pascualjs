@@ -141,6 +141,30 @@
     }
   }
 
+  class EqNode {
+    constructor(a, b) {
+      this.a = a;
+      this.b = b;
+      this.type = "Boolean";
+    }
+
+    simulate() {
+      return this.a.simulate() === this.b.simulate();
+    }
+  }
+
+  class LtNode {
+    constructor(a, b) {
+      this.a = a;
+      this.b = b;
+      this.type = "Boolean";
+    }
+
+    simulate() {
+      return this.a.simulate() < this.b.simulate();
+    }
+  }
+
   class BooleanLiteralNode {
     constructor(boolean) {
       this.boolean = boolean;
@@ -350,6 +374,20 @@
             throw(`Incompatible types for substraction ${left.type} and ${right.type} at line ${token.line}, col ${token.col}`);
           }
           left = new IntegerSubNode(left, right);
+        } else if(token.type === "EQ") {
+          this.lexer.consume("EQ");
+          const right = this.factor(symTable);
+          if(left.type !== right.type) {
+            throw(`Incompatible types for eq ${left.type} and ${right.type} at line ${token.line}, col ${token.col}`);
+          }
+          left = new EqNode(left, right);
+        } else if(token.type === "LT") {
+          this.lexer.consume("LT");
+          const right = this.factor(symTable);
+          if(left.type !== "Integer" || right.type !== "Integer") {
+            throw(`Incompatible types for lt ${left.type} and ${right.type} at line ${token.line}, col ${token.col}`);
+          }
+          left = new LtNode(left, right);
         } else {
           break;
         }
@@ -548,6 +586,14 @@
         token.val = ")";
         this.offset++;
         token.type = "RIGHT_PAREN";
+      } else if(this.input[this.offset] === "=") {
+        token.val = "=";
+        this.offset++;
+        token.type = "EQ";
+      } else if(this.input[this.offset] === "<") {
+        token.val = "<";
+        this.offset++;
+        token.type = "LT";
       } else {
         throw(`Unknown token ${this.input[this.offset]} at line ${this.line}, col ${this.col}`);
       }
