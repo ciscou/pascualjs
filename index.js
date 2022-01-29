@@ -14,9 +14,19 @@
   });
 
   class ProgramNode {
-    constructor(name, symTable, instructions) {
+    constructor(name, symTable, instruction) {
       this.name = name;
       this.symTable = symTable;
+      this.instruction = instruction;
+    }
+
+    simulate() {
+      this.instruction.simulate();
+    }
+  }
+
+  class InstructionsBlockNode {
+    constructor(instructions) {
       this.instructions = instructions;
     }
 
@@ -38,6 +48,29 @@
       } else {
         this.elseInstruction.simulate();
       }
+    }
+  }
+
+  class WhileInstructionNode {
+    constructor(condition, instruction) {
+      this.condition = condition;
+      this.instruction = instruction;
+    }
+
+    simulate() {
+      while(this.condition.simulate()) {
+        this.instruction.simulate();
+      }
+    }
+  }
+
+  class WritelnInstructionNode {
+    constructor(expression) {
+      this.expression = expression;
+    }
+
+    simulate() {
+      console.log(this.expression.simulate());
     }
   }
 
@@ -108,6 +141,18 @@
     }
   }
 
+  class IntegerModNode {
+    constructor(a, b) {
+      this.a = a;
+      this.b = b;
+      this.type = "Integer";
+    }
+
+    simulate() {
+      return this.a.simulate() % this.b.simulate();
+    }
+  }
+
   class IntegerLiteralNode {
     constructor(integer) {
       this.integer = integer
@@ -162,6 +207,18 @@
 
     simulate() {
       return this.a.simulate() < this.b.simulate();
+    }
+  }
+
+  class LteNode {
+    constructor(a, b) {
+      this.a = a;
+      this.b = b;
+      this.type = "Boolean";
+    }
+
+    simulate() {
+      return this.a.simulate() <= this.b.simulate();
     }
   }
 
@@ -236,13 +293,11 @@
       const id = this.lexer.consume("ID");
       this.lexer.consume("SEMICOLON");
       const symTable = this.varsDeclarations();
-      this.lexer.consume("begin");
-      const instructions = this.instructions(symTable);
-      this.lexer.consume("end");
+      const instruction = this.instructionsBlock(symTable);
       this.lexer.consume("DOT");
       this.lexer.consume("EOF");
 
-      return new ProgramNode(id.val, symTable, instructions);
+      return new ProgramNode(id.val, symTable, instruction);
     }
 
     varsDeclarations() {
@@ -316,11 +371,27 @@
       const token = this.lexer.peek();
       if(token.type === "end") return new NoOpNode();
 
-      if(token.type === "if") {
+      if(token.type === "begin") {
+        return this.instructionsBlock(symTable);
+      } else if(token.type === "if") {
         return this.ifInstruction(symTable);
+      } else if(token.type === "while") {
+        return this.whileInstruction(symTable);
+      } else if(token.type === "writeln") {
+        return this.writelnInstruction(symTable);
       } else {
         return this.assignmentInstruction(symTable);
       }
+    }
+
+    instructionsBlock(symTable) {
+      this.lexer.consume("begin");
+
+      const instructions = this.instructions(symTable);
+
+      this.lexer.consume("end");
+
+      return new InstructionsBlockNode(instructions);
     }
 
     ifInstruction(symTable) {
@@ -337,6 +408,28 @@
       const elseInstruction = this.instruction(symTable);
 
       return new IfInstructionNode(condition, ifInstruction, elseInstruction);
+    }
+
+    whileInstruction(symTable) {
+      const token = this.lexer.consume("while");
+      const condition = this.expression(symTable);
+      if(condition.type !== "Boolean") {
+        throw(`Invalid type for while instruction, expected Boolean, got ${condition.type} at line ${token.line}, col ${token.col}`);
+      }
+
+      this.lexer.consume("do");
+      const instruction = this.instruction(symTable);
+
+      return new WhileInstructionNode(condition, instruction);
+    }
+
+    writelnInstruction(symTable) {
+      const token = this.lexer.consume("writeln");
+      this.lexer.consume("LEFT_PAREN");
+      const expression = this.expression(symTable);
+      this.lexer.consume("RIGHT_PAREN");
+
+      return new WritelnInstructionNode(expression);
     }
 
     assignmentInstruction(symTable) {
@@ -388,6 +481,13 @@
             throw(`Incompatible types for lt ${left.type} and ${right.type} at line ${token.line}, col ${token.col}`);
           }
           left = new LtNode(left, right);
+        } else if(token.type === "LTE") {
+          this.lexer.consume("LTE");
+          const right = this.factor(symTable);
+          if(left.type !== "Integer" || right.type !== "Integer") {
+            throw(`Incompatible types for lte ${left.type} and ${right.type} at line ${token.line}, col ${token.col}`);
+          }
+          left = new LteNode(left, right);
         } else {
           break;
         }
@@ -416,6 +516,20 @@
             throw(`Incompatible types for division ${left.type} and ${right.type} at line ${token.line}, col ${token.col}`);
           }
           left = new IntegerDivNode(left, right);
+        } else if(token.type === "div") {
+          this.lexer.consume("div");
+          const right = this.term(symTable);
+          if(left.type !== "Integer" || right.type !== "Integer") {
+            throw(`Incompatible types for division ${left.type} and ${right.type} at line ${token.line}, col ${token.col}`);
+          }
+          left = new IntegerDivNode(left, right);
+        } else if(token.type === "mod") {
+          this.lexer.consume("mod");
+          const right = this.term(symTable);
+          if(left.type !== "Integer" || right.type !== "Integer") {
+            throw(`Incompatible types for mod ${left.type} and ${right.type} at line ${token.line}, col ${token.col}`);
+          }
+          left = new IntegerModNode(left, right);
         } else if(token.type === "and") {
           this.lexer.consume("and");
           const right = this.term(symTable);
@@ -478,7 +592,7 @@
     }
   }
 
-  const KEYWORDS = ["program", "begin", "end", "var", "if", "then", "else", "and", "or", "not", "true", "false"];
+  const KEYWORDS = ["program", "begin", "end", "var", "if", "then", "else", "while", "do", "and", "or", "not", "true", "false", "mod", "div", "writeln"];
   const TYPES = ["Integer", "Boolean"];
 
   class Lexer {
@@ -527,7 +641,6 @@
           token.val += this.input[this.offset];
           this.offset++;
         }
-
         if(TYPES.includes(token.val)) {
           token.type = "TYPE";
         } else if(KEYWORDS.includes(token.val)) {
@@ -540,7 +653,6 @@
           token.val += this.input[this.offset];
           this.offset++;
         }
-
         token.type = "INTEGER_LITERAL";
       } else if(this.offset + 1 < this.input.length && this.input[this.offset] === ":" && this.input[this.offset + 1] === "=") {
         token.val = ":=";
@@ -590,6 +702,10 @@
         token.val = "=";
         this.offset++;
         token.type = "EQ";
+      } else if(this.offset + 1 < this.input.length && this.input[this.offset] === "<" && this.input[this.offset + 1] === "=") {
+        token.val = "<=";
+        this.offset += 2;
+        token.type = "LTE";
       } else if(this.input[this.offset] === "<") {
         token.val = "<";
         this.offset++;
