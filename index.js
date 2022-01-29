@@ -103,6 +103,78 @@
     }
   }
 
+  class IntegerUnaryAddNode {
+    constructor(expression) {
+      this.expression = expression
+      this.type = "Integer";
+    }
+
+    simulate() {
+      return this.expression.simulate();
+    }
+  }
+
+  class IntegerUnarySubNode {
+    constructor(expression) {
+      this.expression = expression
+      this.type = "Integer";
+    }
+
+    simulate() {
+      return -this.expression.simulate();
+    }
+  }
+
+  class BooleanLiteralNode {
+    constructor(boolean) {
+      this.boolean = boolean;
+      this.type = "Boolean";
+    }
+
+    simulate() {
+      return this.boolean;
+    }
+  }
+
+  class BooleanAndNode {
+    constructor(a, b) {
+      this.a = a;
+      this.b = b;
+      this.type = "Boolean";
+    }
+
+    simulate() {
+      const a = this.a.simulate();
+      const b = this.b.simulate();
+      return a && b;
+    }
+  }
+
+  class BooleanOrNode {
+    constructor(a, b) {
+      this.a = a;
+      this.b = b;
+      this.type = "Boolean";
+    }
+
+    simulate() {
+      const a = this.a.simulate();
+      const b = this.b.simulate();
+      return a || b;
+    }
+  }
+
+  class BooleanNotNode {
+    constructor(expression) {
+      this.expression = expression;
+      this.type = "Boolean";
+    }
+
+    simulate() {
+      return !this.expression.simulate();
+    }
+  }
+
   class VariableNode {
     constructor(variable) {
       this.variable = variable;
@@ -171,14 +243,14 @@
 
       this.lexer.consume("COLON");
 
-      this.lexer.consume("Integer");
+      const type = this.lexer.consume("TYPE");
 
       this.lexer.consume("SEMICOLON");
 
       varNames.forEach(varName => {
         if(symTable[varName.val]) throw(`Variable ${varName.val} already exists! At line ${varName.line}, col ${varName.col}`);
 
-        symTable[varName.val] = { name: varName.val, type: "Integer" };
+        symTable[varName.val] = { name: varName.val, type: type.val };
       });
     }
 
@@ -211,7 +283,7 @@
       const variable = symTable[varName.val];
       if(!variable) throw(`Variable ${varName.val} doesn't exist! At line ${varName.line}, col ${varName.col}`);
 
-      if(variable.type !== "Integer" || expression.type !== "Integer") {
+      if(variable.type !== expression.type) {
         throw(`Incompatible types ${variable.type} and ${expression.type} at line ${assign.line}, col ${assign.col}`);
       }
 
@@ -266,6 +338,20 @@
             throw(`Incompatible types for division ${left.type} and ${right.type} at line ${token.line}, col ${token.col}`);
           }
           left = new IntegerDivNode(left, right);
+        } else if(token.type === "and") {
+          this.lexer.consume("and");
+          const right = this.term(symTable);
+          if(left.type !== "Boolean" || right.type !== "Boolean") {
+            throw(`Incompatible types for and ${left.type} and ${right.type} at line ${token.line}, col ${token.col}`);
+          }
+          left = new BooleanAndNode(left, right);
+        } else if(token.type === "or") {
+          this.lexer.consume("or");
+          const right = this.term(symTable);
+          if(left.type !== "Boolean" || right.type !== "Boolean") {
+            throw(`Incompatible types for and ${left.type} and ${right.type} at line ${token.line}, col ${token.col}`);
+          }
+          left = new BooleanOrNode(left, right);
         } else {
           break;
         }
@@ -275,28 +361,47 @@
     }
 
     term(symTable) {
-      const token = this.lexer.peek();
+      const token = this.lexer.nextToken();
 
       if(token.type === "INTEGER_LITERAL") {
-        this.lexer.consume("INTEGER_LITERAL");
         return new IntegerLiteralNode(parseInt(token.val));
+      } else if(token.type === "ADD") {
+        const expression = this.expression(symTable);
+        if(expression.type !== "Integer") {
+          throw(`Incompatible type for unary add ${expression.type} at line ${token.line}, col ${token.col}`);
+        }
+        return new IntegerUnaryAddNode(expression);
+      } else if(token.type === "SUB") {
+        const expression = this.expression(symTable);
+        if(expression.type !== "Integer") {
+          throw(`Incompatible type for unary sub ${expression.type} at line ${token.line}, col ${token.col}`);
+        }
+        return new IntegerUnarySubNode(expression);
       } else if(token.type === "ID") {
         if(!symTable[token.val]) throw(`Variable ${token.val} doesn't exist! At line ${token.line}, col ${token.col}`);
-
-        this.lexer.consume("ID");
         return new VariableNode(symTable[token.val]);
       } else if(token.type === "LEFT_PAREN") {
-        this.lexer.consume("LEFT_PAREN");
         const expression = this.expression(symTable);
         this.lexer.consume("RIGHT_PAREN");
         return expression;
+      } else if(token.type === "true") {
+        return new BooleanLiteralNode(true);
+      } else if(token.type === "false") {
+        return new BooleanLiteralNode(false);
+      } else if(token.type === "not") {
+        const expression = this.expression(symTable);
+        if(expression.type !== "Boolean") {
+          throw(`Incompatible type for not ${expression.type} at line ${token.line}, col ${token.col}`);
+        }
+        return new BooleanNotNode(expression);
       } else {
-        this.lexer.consume("INTEGER_LITERAL");
+        throw(`Invalid token ${token.type} at line ${token.line}, col ${token.col}`);
       }
     }
   }
 
-  const KEYWORDS = ["program", "begin", "end", "var", "Integer"];
+  const KEYWORDS = ["program", "begin", "end", "var", "and", "or", "not", "true", "false"];
+  const TYPES = ["Integer", "Boolean"];
 
   class Lexer {
     constructor(input) {
@@ -345,7 +450,9 @@
           this.offset++;
         }
 
-        if(KEYWORDS.includes(token.val)) {
+        if(TYPES.includes(token.val)) {
+          token.type = "TYPE";
+        } else if(KEYWORDS.includes(token.val)) {
           token.type = token.val;
         } else {
           token.type = "ID";
