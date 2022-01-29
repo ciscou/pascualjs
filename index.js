@@ -25,7 +25,23 @@
     }
   }
 
-  class AssignmentNode {
+  class IfInstructionNode {
+    constructor(condition, ifInstruction, elseInstruction) {
+      this.condition = condition;
+      this.ifInstruction = ifInstruction;
+      this.elseInstruction = elseInstruction;
+    }
+
+    simulate() {
+      if(this.condition.simulate()) {
+        this.ifInstruction.simulate();
+      } else {
+        this.elseInstruction.simulate();
+      }
+    }
+  }
+
+  class AssignmentInstructionNode {
     constructor(variable, expression) {
       this.variable = variable;
       this.expression = expression;
@@ -276,6 +292,30 @@
       const token = this.lexer.peek();
       if(token.type === "end") return new NoOpNode();
 
+      if(token.type === "if") {
+        return this.ifInstruction(symTable);
+      } else {
+        return this.assignmentInstruction(symTable);
+      }
+    }
+
+    ifInstruction(symTable) {
+      const token = this.lexer.consume("if");
+      const condition = this.expression(symTable);
+      if(condition.type !== "Boolean") {
+        throw(`Invalid type for if instruction, expected Boolean, got ${condition.type} at line ${token.line}, col ${token.col}`);
+      }
+
+      this.lexer.consume("then");
+      const ifInstruction = this.instruction(symTable);
+
+      this.lexer.consume("else");
+      const elseInstruction = this.instruction(symTable);
+
+      return new IfInstructionNode(condition, ifInstruction, elseInstruction);
+    }
+
+    assignmentInstruction(symTable) {
       const varName = this.lexer.consume("ID");
       const assign = this.lexer.consume("ASSIGN");
       const expression = this.expression(symTable);
@@ -287,7 +327,7 @@
         throw(`Incompatible types ${variable.type} and ${expression.type} at line ${assign.line}, col ${assign.col}`);
       }
 
-      return new AssignmentNode(symTable[varName.val], expression);
+      return new AssignmentInstructionNode(symTable[varName.val], expression);
     }
 
     expression(symTable) {
@@ -400,7 +440,7 @@
     }
   }
 
-  const KEYWORDS = ["program", "begin", "end", "var", "and", "or", "not", "true", "false"];
+  const KEYWORDS = ["program", "begin", "end", "var", "if", "then", "else", "and", "or", "not", "true", "false"];
   const TYPES = ["Integer", "Boolean"];
 
   class Lexer {
