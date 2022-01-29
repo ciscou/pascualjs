@@ -6,9 +6,101 @@
     e.preventDefault();
 
     const parser = new Parser(textarea.value);
-    parser.parse();
+    const ast = parser.parse();
+    ast.simulate();
     console.log(parser.variables());
   });
+
+  class ProgramNode {
+    constructor(name, instructions) {
+      this.instructions = instructions
+    }
+
+    simulate() {
+      console.log(this.instructions);
+      this.instructions.forEach(instruction => instruction.simulate())
+    }
+  }
+
+  class AssignmentNode {
+    constructor(variable, expression) {
+      this.variable = variable;
+      this.expression = expression;
+    }
+
+    simulate() {
+      this.variable.value = this.expression.simulate();
+    }
+  }
+
+  class NoOpNode {
+    simulate() {
+    }
+  }
+
+  class AddNode {
+    constructor(a, b) {
+      this.a = a;
+      this.b = b;
+    }
+
+    simulate() {
+      return this.a.simulate() + this.b.simulate();
+    }
+  }
+
+  class SubNode {
+    constructor(a, b) {
+      this.a = a;
+      this.b = b;
+    }
+
+    simulate() {
+      return this.a.simulate() - this.b.simulate();
+    }
+  }
+
+  class MulNode {
+    constructor(a, b) {
+      this.a = a;
+      this.b = b;
+    }
+
+    simulate() {
+      return this.a.simulate() * this.b.simulate();
+    }
+  }
+
+  class DivNode {
+    constructor(a, b) {
+      this.a = a;
+      this.b = b;
+    }
+
+    simulate() {
+      return this.a.simulate() / this.b.simulate();
+    }
+  }
+
+  class NumberNode {
+    constructor(n) {
+      this.n = n
+    }
+
+    simulate() {
+      return this.n;
+    }
+  }
+
+  class VariableNode {
+    constructor(variable) {
+      this.variable = variable;
+    }
+
+    simulate() {
+      return this.variable.value;
+    }
+  }
 
   const KEYWORDS = ["program", "begin", "end"];
 
@@ -20,79 +112,88 @@
 
     parse(input) {
       this.lexer.consume("program");
-      this.lexer.consume("ID");
+      const id = this.lexer.consume("ID");
       this.lexer.consume("SEMICOLON");
       this.lexer.consume("begin");
-      this.instructions();
+      const instructions = this.instructions();
       this.lexer.consume("end");
       this.lexer.consume("DOT");
       this.lexer.consume("EOF");
+
+      return new ProgramNode(id.val, instructions);
     }
 
     instructions() {
-      this.instruction();
+      const res = [];
+
+      res.push(this.instruction());
 
       while(true) {
         const token = this.lexer.peek();
         if(token.type === "SEMICOLON") {
           this.lexer.consume("SEMICOLON");
-          this.instruction()
+          res.push(this.instruction());
         } else {
           break;
         }
       }
+
+      return res;
     }
 
     instruction() {
       const token = this.lexer.peek();
-      if(token.type === "end") return;
+      if(token.type === "end") return new NoOpNode();
 
       const id = this.lexer.consume("ID");
       this.lexer.consume("ASSIGN");
       const expression = this.expression();
 
-      this._variables[id.val] = expression;
-      console.log(id, expression);
+      if(!this._variables[id.val]) {
+        this._variables[id.val] = { name: id.val }
+      }
+
+      return new AssignmentNode(this._variables[id.val], expression);
     }
 
     expression() {
-      let a = this.factor();
+      let res = this.factor();
 
       while(true) {
         const token = this.lexer.peek();
 
         if(token.type === "ADD") {
           this.lexer.consume("ADD");
-          a = a + this.factor();
+          res = new AddNode(res, this.factor());
         } else if(token.type === "SUB") {
           this.lexer.consume("SUB");
-          a = a - this.factor();
+          res = new SubNode(res, this.factor());
         } else {
           break;
         }
       }
 
-      return a;
+      return res;
     }
 
     factor() {
-      let a = this.term();
+      let res = this.term();
 
       while(true) {
         const token = this.lexer.peek();
 
         if(token.type === "MUL") {
           this.lexer.consume("MUL");
-          a = a * this.term();
+          res = new MulNode(res, this.term());
         } else if(token.type === "DIV") {
           this.lexer.consume("DIV");
-          a = a / this.term();
+          res = new DivNode(res, this.term());
         } else {
           break;
         }
       }
 
-      return a;
+      return res;
     }
 
     term() {
@@ -100,10 +201,15 @@
 
       if(token.type === "INTEGER_LITERAL") {
         this.lexer.consume("INTEGER_LITERAL");
-        return parseInt(token.val);
+        return new NumberNode(parseInt(token.val));
       } else if(token.type === "ID") {
         this.lexer.consume("ID");
-        return this._variables[token.val];
+        return new VariableNode(this._variables[token.val]);
+      } else if(token.type === "LEFT_PAREN") {
+        this.lexer.consume("LEFT_PAREN");
+        const expression = this.expression();
+        this.lexer.consume("RIGHT_PAREN");
+        return expression;
       } else {
         this.lexer.consume("INTEGER_LITERAL");
       }
@@ -201,6 +307,14 @@
         token.val = "/";
         this.offset++;
         token.type = "DIV";
+      } else if(this.input[this.offset] === "(") {
+        token.val = "(";
+        this.offset++;
+        token.type = "LEFT_PAREN";
+      } else if(this.input[this.offset] === ")") {
+        token.val = ")";
+        this.offset++;
+        token.type = "RIGHT_PAREN";
       } else {
         throw(`Unknown token ${this.input[this.offset]} at line ${this.line}, col ${this.col}`);
       }
