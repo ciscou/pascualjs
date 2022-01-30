@@ -8,7 +8,7 @@
     const parser = new Parser(textarea.value);
     const ast = parser.parse();
 
-    ast.simulate();
+    ast.simulate({});
 
     console.log(ast);
   });
@@ -19,8 +19,8 @@
       this.instruction = instruction;
     }
 
-    simulate() {
-      this.instruction.simulate();
+    simulate(ctx) {
+      this.instruction.simulate(ctx);
     }
   }
 
@@ -29,8 +29,8 @@
       this.instructions = instructions;
     }
 
-    simulate() {
-      this.instructions.forEach(instruction => instruction.simulate());
+    simulate(ctx) {
+      this.instructions.forEach(instruction => instruction.simulate(ctx));
     }
   }
 
@@ -41,11 +41,11 @@
       this.elseInstruction = elseInstruction;
     }
 
-    simulate() {
-      if(this.condition.simulate()) {
-        this.ifInstruction.simulate();
+    simulate(ctx) {
+      if(this.condition.simulate(ctx)) {
+        this.ifInstruction.simulate(ctx);
       } else {
-        this.elseInstruction.simulate();
+        this.elseInstruction.simulate(ctx);
       }
     }
   }
@@ -56,9 +56,9 @@
       this.instruction = instruction;
     }
 
-    simulate() {
-      while(this.condition.simulate()) {
-        this.instruction.simulate();
+    simulate(ctx) {
+      while(this.condition.simulate(ctx)) {
+        this.instruction.simulate(ctx);
       }
     }
   }
@@ -68,8 +68,8 @@
       this.expression = expression;
     }
 
-    simulate() {
-      console.log(this.expression.simulate());
+    simulate(ctx) {
+      console.log(this.expression.simulate(ctx));
     }
   }
 
@@ -79,8 +79,8 @@
       this.expression = expression;
     }
 
-    simulate() {
-      this.variable.value = this.expression.simulate();
+    simulate(ctx) {
+      ctx[this.variable.name] = this.expression.simulate(ctx);
     }
   }
 
@@ -91,17 +91,18 @@
       this.type = fun.returnType;
     }
 
-    simulate() {
+    simulate(ctx) {
+      const ctx2 = { "$parent$": ctx }; // TODO do we need this?
       for(let i=0; i<this.args.length; i++) {
-        this.fun.symTable[this.fun.args[i].name].value = this.args[i].simulate();
+        ctx2[this.fun.args[i].name] = this.args[i].simulate(ctx);
       }
-      this.fun.instruction.simulate();
-      return this.fun.symTable["$res$"].value;
+      this.fun.instruction.simulate(ctx2);
+      return ctx2["$res$"];
     }
   }
 
   class NoOpNode {
-    simulate() {
+    simulate(ctx) {
       // well... no-op. surprise!
     }
   }
@@ -113,8 +114,8 @@
       this.type = "Integer";
     }
 
-    simulate() {
-      return this.a.simulate() + this.b.simulate();
+    simulate(ctx) {
+      return this.a.simulate(ctx) + this.b.simulate(ctx);
     }
   }
 
@@ -125,8 +126,8 @@
       this.type = "Integer";
     }
 
-    simulate() {
-      return this.a.simulate() - this.b.simulate();
+    simulate(ctx) {
+      return this.a.simulate(ctx) - this.b.simulate(ctx);
     }
   }
 
@@ -137,8 +138,8 @@
       this.type = "Integer";
     }
 
-    simulate() {
-      return this.a.simulate() * this.b.simulate();
+    simulate(ctx) {
+      return this.a.simulate(ctx) * this.b.simulate(ctx);
     }
   }
 
@@ -149,8 +150,8 @@
       this.type = "Integer";
     }
 
-    simulate() {
-      return Math.floor(this.a.simulate() / this.b.simulate());
+    simulate(ctx) {
+      return Math.floor(this.a.simulate(ctx) / this.b.simulate(ctx));
     }
   }
 
@@ -161,8 +162,8 @@
       this.type = "Integer";
     }
 
-    simulate() {
-      return this.a.simulate() % this.b.simulate();
+    simulate(ctx) {
+      return this.a.simulate(ctx) % this.b.simulate(ctx);
     }
   }
 
@@ -172,7 +173,7 @@
       this.type = "Integer";
     }
 
-    simulate() {
+    simulate(ctx) {
       return this.integer;
     }
   }
@@ -183,8 +184,8 @@
       this.type = "Integer";
     }
 
-    simulate() {
-      return this.expression.simulate();
+    simulate(ctx) {
+      return this.expression.simulate(ctx);
     }
   }
 
@@ -194,8 +195,8 @@
       this.type = "Integer";
     }
 
-    simulate() {
-      return -this.expression.simulate();
+    simulate(ctx) {
+      return -this.expression.simulate(ctx);
     }
   }
 
@@ -206,8 +207,8 @@
       this.type = "Real";
     }
 
-    simulate() {
-      return this.a.simulate() / this.b.simulate();
+    simulate(ctx) {
+      return this.a.simulate(ctx) / this.b.simulate(ctx);
     }
   }
 
@@ -218,8 +219,8 @@
       this.type = "Boolean";
     }
 
-    simulate() {
-      return this.a.simulate() === this.b.simulate();
+    simulate(ctx) {
+      return this.a.simulate(ctx) === this.b.simulate(ctx);
     }
   }
 
@@ -230,8 +231,8 @@
       this.type = "Boolean";
     }
 
-    simulate() {
-      return this.a.simulate() < this.b.simulate();
+    simulate(ctx) {
+      return this.a.simulate(ctx) < this.b.simulate(ctx);
     }
   }
 
@@ -242,8 +243,8 @@
       this.type = "Boolean";
     }
 
-    simulate() {
-      return this.a.simulate() > this.b.simulate();
+    simulate(ctx) {
+      return this.a.simulate(ctx) > this.b.simulate(ctx);
     }
   }
 
@@ -254,8 +255,8 @@
       this.type = "Boolean";
     }
 
-    simulate() {
-      return this.a.simulate() <= this.b.simulate();
+    simulate(ctx) {
+      return this.a.simulate(ctx) <= this.b.simulate(ctx);
     }
   }
 
@@ -266,8 +267,8 @@
       this.type = "Boolean";
     }
 
-    simulate() {
-      return this.a.simulate() >= this.b.simulate();
+    simulate(ctx) {
+      return this.a.simulate(ctx) >= this.b.simulate(ctx);
     }
   }
 
@@ -277,7 +278,7 @@
       this.type = "Boolean";
     }
 
-    simulate() {
+    simulate(ctx) {
       return this.boolean;
     }
   }
@@ -289,9 +290,9 @@
       this.type = "Boolean";
     }
 
-    simulate() {
-      const a = this.a.simulate();
-      const b = this.b.simulate();
+    simulate(ctx) {
+      const a = this.a.simulate(ctx);
+      const b = this.b.simulate(ctx);
       return a && b;
     }
   }
@@ -303,9 +304,9 @@
       this.type = "Boolean";
     }
 
-    simulate() {
-      const a = this.a.simulate();
-      const b = this.b.simulate();
+    simulate(ctx) {
+      const a = this.a.simulate(ctx);
+      const b = this.b.simulate(ctx);
       return a || b;
     }
   }
@@ -316,8 +317,8 @@
       this.type = "Boolean";
     }
 
-    simulate() {
-      return !this.expression.simulate();
+    simulate(ctx) {
+      return !this.expression.simulate(ctx);
     }
   }
 
@@ -327,8 +328,8 @@
       this.type = this.variable.type;
     }
 
-    simulate() {
-      return this.variable.value;
+    simulate(ctx) {
+      return ctx[this.variable.name];
     }
   }
 
@@ -405,7 +406,7 @@
         }
       }
 
-      this.symTable[id.val] = { name: id.val, type: "Function", args: args, returnType: type.val, symTable: this.symTable };
+      this.symTable[id.val] = { name: id.val, type: "Function", args: args, returnType: type.val };
       this.symTable["$fun$"] = id.val;
       this.symTable["$res$"] = { name: "$res$", type: type.val };
 
@@ -415,7 +416,7 @@
 
       this.symTable[id.val].instruction = instruction // backpatch
 
-      this.symTable["$parent$"][id.val] = { name: id.val, type: "Function", args: args, returnType: type.val, instruction: instruction, symTable: this.symTable };
+      this.symTable["$parent$"][id.val] = { name: id.val, type: "Function", args: args, returnType: type.val, instruction: instruction };
 
       this.symTable = this.symTable["$parent$"];
     }
