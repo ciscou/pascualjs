@@ -82,6 +82,37 @@
     }
   }
 
+  class ArrayReadNode {
+    constructor(ary, index) {
+      console.log("array read", this, ary, index);
+      this.ary = ary;
+      this.index = index;
+      this.type = ary.typeSpecs.itemType;
+    }
+
+    simulate(ctx) {
+      const index = this.index.simulate(ctx);
+      console.log("reading array", this.ary);
+      return ctx[this.ary.name][index];
+    }
+  }
+
+  class ArrayWriteNode {
+    constructor(ary, index, expression) {
+      console.log("array write", this, ary, index);
+      this.ary = ary;
+      this.index = index;
+      this.expression = expression;
+    }
+
+    simulate(ctx) {
+      const index = this.index.simulate(ctx);
+      console.log("writing array", this.ary);
+      if(!ctx[this.ary.name]) ctx[this.ary.name] = [];
+      ctx[this.ary.name][index] = this.expression.simulate(ctx);
+    }
+  }
+
   class FunctionCallNode {
     constructor(fun, args) {
       this.fun = fun;
@@ -374,13 +405,13 @@
         const token = this.lexer.peek();
 
         if(token.type === "ID") {
-          const { varNames, type } = this.varDeclaration();
+          const { varNames, type, typeSpecs } = this.varDeclaration();
 
           varNames.forEach(varName => {
             if(this.symTable[varName.val]) throw(`Variable ${varName.val} already exists! At line ${varName.line}, col ${varName.col}`);
 
-            this.symTable[varName.val] = { name: varName.val, type: type.val };
-            args.push({ name: varName.val, type: type.val });
+            this.symTable[varName.val] = { name: varName.val, type: type.val, typeSpecs: typeSpecs };
+            args.push({ name: varName.val, type: type.val, typeSpecs: typeSpecs });
           });
         } else {
           break;
@@ -428,12 +459,12 @@
           const token = this.lexer.peek();
 
           if(token.type === "ID") {
-            const { varNames, type } = this.varDeclaration();
+            const { varNames, type, typeSpecs } = this.varDeclaration();
 
             varNames.forEach(varName => {
               if(this.symTable[varName.val]) throw(`Variable ${varName.val} already exists! At line ${varName.line}, col ${varName.col}`);
 
-              this.symTable[varName.val] = { name: varName.val, type: type.val };
+              this.symTable[varName.val] = { name: varName.val, type: type.val, typeSpecs: typeSpecs };
             });
 
             this.lexer.consume("SEMICOLON");
@@ -462,8 +493,23 @@
       this.lexer.consume("COLON");
 
       const type = this.lexer.consume("TYPE");
+      const typeSpecs = {};
 
-      return { varNames: varNames, type: type };
+      if(type.val === "Array") {
+        this.lexer.consume("LEFT_BRACKET");
+        const low = this.lexer.consume("INTEGER_LITERAL");
+        this.lexer.consume("DOTDOT");
+        const high = this.lexer.consume("INTEGER_LITERAL");
+        this.lexer.consume("RIGHT_BRACKET");
+        this.lexer.consume("of");
+        const itemType = this.lexer.consume("TYPE");
+
+        typeSpecs.low = parseInt(low.val);
+        typeSpecs.high = parseInt(high.val);
+        typeSpecs.itemType = itemType.val;
+      }
+
+      return { varNames: varNames, type: type, typeSpecs: typeSpecs };
     }
 
     instructions() {
@@ -551,17 +597,34 @@
 
     assignmentInstruction() {
       const varName = this.lexer.consume("ID");
-      const assign = this.lexer.consume("ASSIGN");
-      const expression = this.expression();
 
       const variable = varName.val === this.symTable["$fun$"] ? this.symTable["$res$"] : this.symTable[varName.val];
       if(!variable) throw(`Variable ${varName.val} doesn't exist! At line ${varName.line}, col ${varName.col}`);
 
-      if(variable.type !== expression.type) {
-        throw(`Incompatible types ${variable.type} and ${expression.type} at line ${assign.line}, col ${assign.col}`);
-      }
+      const token = this.lexer.peek();
+      if(token.type === "LEFT_BRACKET") {
+        this.lexer.consume("LEFT_BRACKET");
+        const index = this.expression();
+        this.lexer.consume("RIGHT_BRACKET");
 
-      return new AssignmentInstructionNode(variable, expression);
+        const assign = this.lexer.consume("ASSIGN");
+        const expression = this.expression();
+
+        if(variable.typeSpecs.itemType !== expression.type) {
+          throw(`Incompatible types ${variable.typeSpecs.itemType} and ${expression.type} at line ${assign.line}, col ${assign.col}`);
+        }
+
+        return new ArrayWriteNode(variable, index, expression);
+      } else {
+        const assign = this.lexer.consume("ASSIGN");
+        const expression = this.expression();
+
+        if(variable.type !== expression.type) {
+          throw(`Incompatible types ${variable.type} and ${expression.type} at line ${assign.line}, col ${assign.col}`);
+        }
+
+        return new AssignmentInstructionNode(variable, expression);
+      }
     }
 
     expressions() {
@@ -762,14 +825,25 @@
           }
         }
         return new FunctionCallNode(sym, args);
+      } else if(token.type === "LEFT_BRACKET") {
+        if(sym.type !== "Array") {
+          throw(`${sym.name} is not an array at line ${token.line}, col ${token.col}`);
+        }
+        this.lexer.consume("LEFT_BRACKET");
+        const index = this.expression();
+        this.lexer.consume("RIGHT_BRACKET");
+        if(index.type !== "Integer") {
+          throw(`Invalid type for array index, expected Integer, got ${index.type}`);
+        }
+        return new ArrayReadNode(sym, index);
       } else {
         return new VariableNode(sym);
       }
     }
   }
 
-  const KEYWORDS = ["program", "begin", "end", "var", "if", "then", "else", "while", "do", "and", "or", "not", "true", "false", "mod", "div", "writeln", "function"];
-  const TYPES = ["Integer", "Boolean"];
+  const KEYWORDS = ["program", "begin", "end", "var", "of", "if", "then", "else", "while", "do", "and", "or", "not", "true", "false", "mod", "div", "writeln", "function"];
+  const TYPES = ["Integer", "Boolean", "Array"];
 
   class Lexer {
     constructor(input) {
@@ -834,6 +908,10 @@
         token.val = ":=";
         this.offset += 2;
         token.type = "ASSIGN";
+      } else if(this.offset + 1 < this.input.length && this.input[this.offset] === "." && this.input[this.offset + 1] === ".") {
+        token.val = "..";
+        this.offset += 2;
+        token.type = "DOTDOT";
       } else if(this.input[this.offset] === ".") {
         token.val = ".";
         this.offset++;
@@ -874,6 +952,14 @@
         token.val = ")";
         this.offset++;
         token.type = "RIGHT_PAREN";
+      } else if(this.input[this.offset] === "[") {
+        token.val = "[";
+        this.offset++;
+        token.type = "LEFT_BRACKET";
+      } else if(this.input[this.offset] === "]") {
+        token.val = "]";
+        this.offset++;
+        token.type = "RIGHT_BRACKET";
       } else if(this.input[this.offset] === "=") {
         token.val = "=";
         this.offset++;

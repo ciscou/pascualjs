@@ -8,24 +8,70 @@
   <body>
     <body>
       <form id="form">
-        <textarea name="code" id="code" rows="16" cols="60">program fibonacci;
+        <textarea name="code" id="code" rows="16" cols="60">program minmax;
 
-function fib(n: Integer): Integer;
+function find_min(arr: Array[0..9] of Integer): Integer;
+var i, res: Integer;
 begin
-  if (n &lt;= 2) then
-    fib := 1
-  else
-    fib := fib(n-1) + fib(n-2)
+  i := 0;
+  res := arr[i];
+
+  while i &lt; 10 do
+  begin
+    if arr[i] &lt; res then
+      res := arr[i]
+    else
+      begin end;
+
+    i := i + 1
+  end;
+
+  find_min := res
 end;
 
-var i: Integer;
+function find_max(arr: Array[0..9] of Integer): Integer;
+var i, res: Integer;
+begin
+  i := 0;
+  res := arr[i];
+
+  while i &lt; 10 do
+  begin
+    if arr[i] &gt; res then
+      res := arr[i]
+    else
+      begin end;
+
+    i := i + 1
+  end;
+
+  find_max := res
+end;
+
+var
+  cap: Integer;
+  arr: Array[0..9] of Integer;
+  min, max, i: Integer;
 
 begin
-  i := 1;
-  while i &lt; 20 do begin
-    writeln(fib(i));
-    i := i + 1
-  end
+  cap := 10;
+
+  arr[0] := 0;
+  arr[1] := -1;
+  arr[2] := 42;
+  arr[3] := 69;
+  arr[4] := -420;
+  arr[5] := 17;
+  arr[6] := 1;
+  arr[7] := 23;
+  arr[8] := 100;
+  arr[9] := 33;
+
+  min := find_min(arr);
+  max := find_max(arr);
+
+  writeln(min);
+  writeln(max)
 end.</textarea>
         <input type="submit" name="Submit" id="submit" value="submit" />
       </form>
