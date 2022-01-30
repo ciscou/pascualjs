@@ -14,9 +14,8 @@
   });
 
   class ProgramNode {
-    constructor(name, symTable, instruction) {
+    constructor(name, instruction) {
       this.name = name;
-      this.symTable = symTable;
       this.instruction = instruction;
     }
 
@@ -342,33 +341,33 @@
       this.lexer.consume("program");
       const id = this.lexer.consume("ID");
       this.lexer.consume("SEMICOLON");
-      const symTable = {};
+      this.symTable = {};
 
       while(true) {
         const token = this.lexer.peek();
 
         if(token.type === "var") {
-          this.varsDeclarations(symTable);
+          this.varsDeclarations();
         } else if(token.type === "function") {
-          this.functionDeclaration(symTable);
+          this.functionDeclaration();
         } else {
           break
         }
       }
 
-      const instruction = this.instructionsBlock(symTable);
+      const instruction = this.instructionsBlock();
       this.lexer.consume("DOT");
       this.lexer.consume("EOF");
 
-      return new ProgramNode(id.val, symTable, instruction);
+      return new ProgramNode(id.val, instruction);
     }
 
-    functionDeclaration(symTable) {
+    functionDeclaration() {
       this.lexer.consume("function");
       const id = this.lexer.consume("ID");
       this.lexer.consume("LEFT_PAREN");
 
-      const symTable2 = { "$parent$": symTable };
+      this.symTable = { "$parent$": this.symTable };
 
       const args = [];
 
@@ -379,9 +378,9 @@
           const { varNames, type } = this.varDeclaration();
 
           varNames.forEach(varName => {
-            if(symTable2[varName.val]) throw(`Variable ${varName.val} already exists! At line ${varName.line}, col ${varName.col}`);
+            if(this.symTable[varName.val]) throw(`Variable ${varName.val} already exists! At line ${varName.line}, col ${varName.col}`);
 
-            symTable2[varName.val] = { name: varName.val, type: type.val };
+            this.symTable[varName.val] = { name: varName.val, type: type.val };
             args.push({ name: varName.val, type: type.val });
           });
         } else {
@@ -400,25 +399,28 @@
         const token = this.lexer.peek();
 
         if(token.type === "var") {
-          this.varsDeclarations(symTable2);
+          this.varsDeclarations();
         } else {
           break
         }
       }
 
-      symTable2[id.val] = { name: id.val, type: "Function", args: args, returnType: type.val, symTable: symTable2 };
-      symTable2["$fun$"] = id.val;
-      symTable2["$res$"] = { name: "$res$", type: type.val };
+      this.symTable[id.val] = { name: id.val, type: "Function", args: args, returnType: type.val, symTable: this.symTable };
+      this.symTable["$fun$"] = id.val;
+      this.symTable["$res$"] = { name: "$res$", type: type.val };
 
-      const instruction = this.instructionsBlock(symTable2);
+      const instruction = this.instructionsBlock();
 
       this.lexer.consume("SEMICOLON");
 
-      symTable2[id.val].instruction = instruction // backpatch
-      symTable[id.val] = { name: id.val, type: "Function", args: args, returnType: type.val, instruction: instruction, symTable: symTable2 };
+      this.symTable[id.val].instruction = instruction // backpatch
+
+      this.symTable["$parent$"][id.val] = { name: id.val, type: "Function", args: args, returnType: type.val, instruction: instruction, symTable: this.symTable };
+
+      this.symTable = this.symTable["$parent$"];
     }
 
-    varsDeclarations(symTable) {
+    varsDeclarations() {
       const token = this.lexer.peek();
       if(token.type === "var") {
         this.lexer.consume("var");
@@ -430,9 +432,9 @@
             const { varNames, type } = this.varDeclaration();
 
             varNames.forEach(varName => {
-              if(symTable[varName.val]) throw(`Variable ${varName.val} already exists! At line ${varName.line}, col ${varName.col}`);
+              if(this.symTable[varName.val]) throw(`Variable ${varName.val} already exists! At line ${varName.line}, col ${varName.col}`);
 
-              symTable[varName.val] = { name: varName.val, type: type.val };
+              this.symTable[varName.val] = { name: varName.val, type: type.val };
             });
 
             this.lexer.consume("SEMICOLON");
@@ -443,7 +445,7 @@
       }
     }
 
-    varDeclaration(symTable) {
+    varDeclaration() {
       const varNames = [];
       varNames.push(this.lexer.consume("ID"));
 
@@ -465,16 +467,16 @@
       return { varNames: varNames, type: type };
     }
 
-    instructions(symTable) {
+    instructions() {
       const res = [];
 
-      res.push(this.instruction(symTable));
+      res.push(this.instruction());
 
       while(true) {
         const token = this.lexer.peek();
         if(token.type === "SEMICOLON") {
           this.lexer.consume("SEMICOLON");
-          res.push(this.instruction(symTable));
+          res.push(this.instruction());
         } else {
           break;
         }
@@ -483,77 +485,77 @@
       return res;
     }
 
-    instruction(symTable) {
+    instruction() {
       const token = this.lexer.peek();
       if(token.type === "end") return new NoOpNode();
 
       if(token.type === "begin") {
-        return this.instructionsBlock(symTable);
+        return this.instructionsBlock();
       } else if(token.type === "if") {
-        return this.ifInstruction(symTable);
+        return this.ifInstruction();
       } else if(token.type === "while") {
-        return this.whileInstruction(symTable);
+        return this.whileInstruction();
       } else if(token.type === "writeln") {
-        return this.writelnInstruction(symTable);
+        return this.writelnInstruction();
       } else {
-        return this.assignmentInstruction(symTable);
+        return this.assignmentInstruction();
       }
     }
 
-    instructionsBlock(symTable) {
+    instructionsBlock() {
       this.lexer.consume("begin");
 
-      const instructions = this.instructions(symTable);
+      const instructions = this.instructions();
 
       this.lexer.consume("end");
 
       return new InstructionsBlockNode(instructions);
     }
 
-    ifInstruction(symTable) {
+    ifInstruction() {
       const token = this.lexer.consume("if");
-      const condition = this.expression(symTable);
+      const condition = this.expression();
       if(condition.type !== "Boolean") {
         throw(`Invalid type for if instruction, expected Boolean, got ${condition.type} at line ${token.line}, col ${token.col}`);
       }
 
       this.lexer.consume("then");
-      const ifInstruction = this.instruction(symTable);
+      const ifInstruction = this.instruction();
 
       this.lexer.consume("else");
-      const elseInstruction = this.instruction(symTable);
+      const elseInstruction = this.instruction();
 
       return new IfInstructionNode(condition, ifInstruction, elseInstruction);
     }
 
-    whileInstruction(symTable) {
+    whileInstruction() {
       const token = this.lexer.consume("while");
-      const condition = this.expression(symTable);
+      const condition = this.expression();
       if(condition.type !== "Boolean") {
         throw(`Invalid type for while instruction, expected Boolean, got ${condition.type} at line ${token.line}, col ${token.col}`);
       }
 
       this.lexer.consume("do");
-      const instruction = this.instruction(symTable);
+      const instruction = this.instruction();
 
       return new WhileInstructionNode(condition, instruction);
     }
 
-    writelnInstruction(symTable) {
+    writelnInstruction() {
       const token = this.lexer.consume("writeln");
       this.lexer.consume("LEFT_PAREN");
-      const expression = this.expression(symTable);
+      const expression = this.expression();
       this.lexer.consume("RIGHT_PAREN");
 
       return new WritelnInstructionNode(expression);
     }
 
-    assignmentInstruction(symTable) {
+    assignmentInstruction() {
       const varName = this.lexer.consume("ID");
       const assign = this.lexer.consume("ASSIGN");
-      const expression = this.expression(symTable);
+      const expression = this.expression();
 
-      const variable = varName.val === symTable["$fun$"] ? symTable["$res$"] : symTable[varName.val];
+      const variable = varName.val === this.symTable["$fun$"] ? this.symTable["$res$"] : this.symTable[varName.val];
       if(!variable) throw(`Variable ${varName.val} doesn't exist! At line ${varName.line}, col ${varName.col}`);
 
       if(variable.type !== expression.type) {
@@ -563,7 +565,7 @@
       return new AssignmentInstructionNode(variable, expression);
     }
 
-    expressions(symTable) {
+    expressions() {
       const res = [];
 
       while(true) {
@@ -572,63 +574,63 @@
         if(token.type === "RIGHT_PAREN") break;
         if(token.type === "COMMA") this.lexer.consume("COMMA");
 
-        res.push(this.expression(symTable));
+        res.push(this.expression());
       }
 
       return res;
     }
 
-    expression(symTable) {
-      let left = this.factor(symTable);
+    expression() {
+      let left = this.factor();
 
       while(true) {
         const token = this.lexer.peek();
 
         if(token.type === "ADD") {
           this.lexer.consume("ADD");
-          const right = this.factor(symTable);
+          const right = this.factor();
           if(left.type !== "Integer" || right.type !== "Integer") {
             throw(`Incompatible types for addition ${left.type} and ${right.type} at line ${token.line}, col ${token.col}`);
           }
           left = new IntegerAddNode(left, right);
         } else if(token.type === "SUB") {
           this.lexer.consume("SUB");
-          const right = this.factor(symTable);
+          const right = this.factor();
           if(left.type !== "Integer" || right.type !== "Integer") {
             throw(`Incompatible types for substraction ${left.type} and ${right.type} at line ${token.line}, col ${token.col}`);
           }
           left = new IntegerSubNode(left, right);
         } else if(token.type === "EQ") {
           this.lexer.consume("EQ");
-          const right = this.factor(symTable);
+          const right = this.factor();
           if(left.type !== right.type) {
             throw(`Incompatible types for eq ${left.type} and ${right.type} at line ${token.line}, col ${token.col}`);
           }
           left = new EqNode(left, right);
         } else if(token.type === "LT") {
           this.lexer.consume("LT");
-          const right = this.factor(symTable);
+          const right = this.factor();
           if(left.type !== "Integer" || right.type !== "Integer") {
             throw(`Incompatible types for lt ${left.type} and ${right.type} at line ${token.line}, col ${token.col}`);
           }
           left = new LtNode(left, right);
         } else if(token.type === "GT") {
           this.lexer.consume("GT");
-          const right = this.factor(symTable);
+          const right = this.factor();
           if(left.type !== "Integer" || right.type !== "Integer") {
             throw(`Incompatible types for lt ${left.type} and ${right.type} at line ${token.line}, col ${token.col}`);
           }
           left = new GtNode(left, right);
         } else if(token.type === "LTE") {
           this.lexer.consume("LTE");
-          const right = this.factor(symTable);
+          const right = this.factor();
           if(left.type !== "Integer" || right.type !== "Integer") {
             throw(`Incompatible types for lte ${left.type} and ${right.type} at line ${token.line}, col ${token.col}`);
           }
           left = new LteNode(left, right);
         } else if(token.type === "GTE") {
           this.lexer.consume("GTE");
-          const right = this.factor(symTable);
+          const right = this.factor();
           if(left.type !== "Integer" || right.type !== "Integer") {
             throw(`Incompatible types for lte ${left.type} and ${right.type} at line ${token.line}, col ${token.col}`);
           }
@@ -641,50 +643,50 @@
       return left;
     }
 
-    factor(symTable) {
-      let left = this.term(symTable);
+    factor() {
+      let left = this.term();
 
       while(true) {
         const token = this.lexer.peek();
 
         if(token.type === "MUL") {
           this.lexer.consume("MUL");
-          const right = this.term(symTable);
+          const right = this.term();
           if(left.type !== "Integer" || right.type !== "Integer") {
             throw(`Incompatible types for multiplication ${left.type} and ${right.type} at line ${token.line}, col ${token.col}`);
           }
           left = new IntegerMulNode(left, right);
         } else if(token.type === "DIV") {
           this.lexer.consume("DIV");
-          const right = this.term(symTable);
+          const right = this.term();
           if(left.type !== "Integer" || right.type !== "Integer") {
             throw(`Incompatible types for division ${left.type} and ${right.type} at line ${token.line}, col ${token.col}`);
           }
           left = new RealDivNode(left, right);
         } else if(token.type === "div") {
           this.lexer.consume("div");
-          const right = this.term(symTable);
+          const right = this.term();
           if(left.type !== "Integer" || right.type !== "Integer") {
             throw(`Incompatible types for division ${left.type} and ${right.type} at line ${token.line}, col ${token.col}`);
           }
           left = new IntegerDivNode(left, right);
         } else if(token.type === "mod") {
           this.lexer.consume("mod");
-          const right = this.term(symTable);
+          const right = this.term();
           if(left.type !== "Integer" || right.type !== "Integer") {
             throw(`Incompatible types for mod ${left.type} and ${right.type} at line ${token.line}, col ${token.col}`);
           }
           left = new IntegerModNode(left, right);
         } else if(token.type === "and") {
           this.lexer.consume("and");
-          const right = this.term(symTable);
+          const right = this.term();
           if(left.type !== "Boolean" || right.type !== "Boolean") {
             throw(`Incompatible types for and ${left.type} and ${right.type} at line ${token.line}, col ${token.col}`);
           }
           left = new BooleanAndNode(left, right);
         } else if(token.type === "or") {
           this.lexer.consume("or");
-          const right = this.term(symTable);
+          const right = this.term();
           if(left.type !== "Boolean" || right.type !== "Boolean") {
             throw(`Incompatible types for and ${left.type} and ${right.type} at line ${token.line}, col ${token.col}`);
           }
@@ -697,34 +699,34 @@
       return left;
     }
 
-    term(symTable) {
+    term() {
       const token = this.lexer.nextToken();
 
       if(token.type === "INTEGER_LITERAL") {
         return new IntegerLiteralNode(parseInt(token.val));
       } else if(token.type === "ADD") {
-        const expression = this.expression(symTable);
+        const expression = this.expression();
         if(expression.type !== "Integer") {
           throw(`Incompatible type for unary add ${expression.type} at line ${token.line}, col ${token.col}`);
         }
         return new IntegerUnaryAddNode(expression);
       } else if(token.type === "SUB") {
-        const expression = this.expression(symTable);
+        const expression = this.expression();
         if(expression.type !== "Integer") {
           throw(`Incompatible type for unary sub ${expression.type} at line ${token.line}, col ${token.col}`);
         }
         return new IntegerUnarySubNode(expression);
       } else if(token.type === "ID") {
         let sym;
-        let table = symTable;
+        let table = this.symTable;
         while(!sym && table) {
           sym = table[token.val];
           table = table["$parent$"];
         }
         if(!sym) throw(`Variable ${token.val} doesn't exist! At line ${token.line}, col ${token.col}`);
-        return this.variableTerm(symTable, sym);
+        return this.variableTerm(sym);
       } else if(token.type === "LEFT_PAREN") {
-        const expression = this.expression(symTable);
+        const expression = this.expression();
         this.lexer.consume("RIGHT_PAREN");
         return expression;
       } else if(token.type === "true") {
@@ -732,7 +734,7 @@
       } else if(token.type === "false") {
         return new BooleanLiteralNode(false);
       } else if(token.type === "not") {
-        const expression = this.expression(symTable);
+        const expression = this.expression();
         if(expression.type !== "Boolean") {
           throw(`Incompatible type for not ${expression.type} at line ${token.line}, col ${token.col}`);
         }
@@ -742,12 +744,12 @@
       }
     }
 
-    variableTerm(symTable, sym) {
+    variableTerm(sym) {
       const token = this.lexer.peek();
 
       if(token.type === "LEFT_PAREN") {
         this.lexer.consume("LEFT_PAREN");
-        const args = this.expressions(symTable);
+        const args = this.expressions();
         this.lexer.consume("RIGHT_PAREN");
         // TODO: check formal and actual parameters
         return new FunctionCallNode(sym, args);
