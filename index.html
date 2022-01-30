@@ -8,35 +8,28 @@
   <body>
     <body>
       <form id="form">
-        <textarea name="code" id="code" rows="16" cols="60">program prime;
+        <textarea name="code" id="code" rows="16" cols="60">program functions;
 
-var
-  max, num, divisor: Integer;
-  is_prime: Boolean;
+function pow(base, exponent: Integer): Integer;
+var i, res: Integer;
+begin
+  res := 1;
+  i := 0;
+  while i &lt; exponent do
+  begin
+    res := res * base;
+    i := i + 1
+  end;
+  pow := res
+end;
+
+function square(n: Integer): Integer;
+begin
+  square := pow(n, 2);
+end;
 
 begin
-  max := 100;
-  num := 2;
-
-  while num &lt;= max do
-  begin
-    is_prime := true;
-    divisor := 2;
-
-    while is_prime and (divisor &lt;= (num / 2)) do
-    begin
-      if num mod divisor = 0 then
-        is_prime := false
-      else
-        begin end;
-
-      divisor := divisor + 1
-    end;
-
-    if is_prime then writeln(num) else begin end;
-
-    num := num + 1
-  end
+  writeln(square(square(3)))
 end.</textarea>
         <input type="submit" name="Submit" id="submit" value="submit" />
       </form>
