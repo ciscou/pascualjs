@@ -9,8 +9,6 @@
     const ast = parser.parse();
 
     ast.simulate({});
-
-    console.log(ast);
   });
 
   class ProgramNode {
