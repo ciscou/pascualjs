@@ -90,7 +90,7 @@
     }
 
     simulate(ctx) {
-      const ctx2 = { "$parent$": ctx }; // TODO do we need this?
+      const ctx2 = {};
       for(let i=0; i<this.args.length; i++) {
         ctx2[this.fun.args[i].name] = this.args[i].simulate(ctx);
       }
@@ -747,10 +747,20 @@
       const token = this.lexer.peek();
 
       if(token.type === "LEFT_PAREN") {
+        if(sym.type !== "Function") {
+          throw(`${sym.name} is not a function at line ${token.line}, col ${token.col}`);
+        }
         this.lexer.consume("LEFT_PAREN");
         const args = this.expressions();
         this.lexer.consume("RIGHT_PAREN");
-        // TODO: check formal and actual parameters
+        if(args.length !== sym.args.length) {
+          throw(`Invalid number of arguments, expected ${sym.args.length}, got ${args.length} at line ${token.line}, col ${token.col}`);
+        }
+        for(let i=0; i<args.length; i++) {
+          if(args[i].type !== sym.args[i].type) {
+            throw(`Invalid type for argument ${i+1}, expected ${sym.args[i].type}, got ${args[i].type} at line ${token.line}, col ${token.col}`);
+          }
+        }
         return new FunctionCallNode(sym, args);
       } else {
         return new VariableNode(sym);
