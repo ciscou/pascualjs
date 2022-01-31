@@ -7,61 +7,62 @@
 
     const parser = new Parser(textarea.value);
     const ast = parser.parse();
+    console.log(ast);
 
     ast.simulate({});
   });
 
   class ProgramNode {
-    constructor(name, instruction) {
+    constructor(name, statement) {
       this.name = name;
-      this.instruction = instruction;
+      this.statement = statement;
     }
 
     simulate(ctx) {
-      this.instruction.simulate(ctx);
+      this.statement.simulate(ctx);
     }
   }
 
-  class InstructionsBlockNode {
-    constructor(instructions) {
-      this.instructions = instructions;
+  class StatementsBlockNode {
+    constructor(statements) {
+      this.statements = statements;
     }
 
     simulate(ctx) {
-      this.instructions.forEach(instruction => instruction.simulate(ctx));
+      this.statements.forEach(statement => statement.simulate(ctx));
     }
   }
 
-  class IfInstructionNode {
-    constructor(condition, ifInstruction, elseInstruction) {
+  class IfStatementNode {
+    constructor(condition, ifStatement, elseStatement) {
       this.condition = condition;
-      this.ifInstruction = ifInstruction;
-      this.elseInstruction = elseInstruction;
+      this.ifStatement = ifStatement;
+      this.elseStatement = elseStatement;
     }
 
     simulate(ctx) {
       if(this.condition.simulate(ctx)) {
-        this.ifInstruction.simulate(ctx);
+        this.ifStatement.simulate(ctx);
       } else {
-        this.elseInstruction.simulate(ctx);
+        this.elseStatement.simulate(ctx);
       }
     }
   }
 
-  class WhileInstructionNode {
-    constructor(condition, instruction) {
+  class WhileStatementNode {
+    constructor(condition, statement) {
       this.condition = condition;
-      this.instruction = instruction;
+      this.statement = statement;
     }
 
     simulate(ctx) {
       while(this.condition.simulate(ctx)) {
-        this.instruction.simulate(ctx);
+        this.statement.simulate(ctx);
       }
     }
   }
 
-  class WritelnInstructionNode {
+  class WritelnStatementNode {
     constructor(expression) {
       this.expression = expression;
     }
@@ -71,7 +72,7 @@
     }
   }
 
-  class AssignmentInstructionNode {
+  class AssignmentStatementNode {
     constructor(variable, expression) {
       this.variable = variable;
       this.expression = expression;
@@ -84,7 +85,6 @@
 
   class ArrayReadNode {
     constructor(ary, index) {
-      console.log("array read", this, ary, index);
       this.ary = ary;
       this.index = index;
       this.type = ary.typeSpecs.itemType;
@@ -92,14 +92,12 @@
 
     simulate(ctx) {
       const index = this.index.simulate(ctx);
-      console.log("reading array", this.ary);
       return ctx[this.ary.name][index];
     }
   }
 
   class ArrayWriteNode {
     constructor(ary, index, expression) {
-      console.log("array write", this, ary, index);
       this.ary = ary;
       this.index = index;
       this.expression = expression;
@@ -107,7 +105,6 @@
 
     simulate(ctx) {
       const index = this.index.simulate(ctx);
-      console.log("writing array", this.ary);
       if(!ctx[this.ary.name]) ctx[this.ary.name] = [];
       ctx[this.ary.name][index] = this.expression.simulate(ctx);
     }
@@ -125,7 +122,7 @@
       for(let i=0; i<this.args.length; i++) {
         ctx2[this.fun.args[i].name] = this.args[i].simulate(ctx);
       }
-      this.fun.instruction.simulate(ctx2);
+      this.fun.statement.simulate(ctx2);
       return ctx2["$res$"];
     }
   }
@@ -385,11 +382,11 @@
         }
       }
 
-      const instruction = this.instructionsBlock();
+      const statement = this.statementsBlock();
       this.lexer.consume("DOT");
       this.lexer.consume("EOF");
 
-      return new ProgramNode(id.val, instruction);
+      return new ProgramNode(id.val, statement);
     }
 
     functionDeclaration() {
@@ -439,13 +436,13 @@
       this.symTable["$fun$"] = id.val;
       this.symTable["$res$"] = { name: "$res$", type: type.val };
 
-      const instruction = this.instructionsBlock();
+      const statement = this.statementsBlock();
 
       this.lexer.consume("SEMICOLON");
 
-      this.symTable[id.val].instruction = instruction // backpatch
+      this.symTable[id.val].statement = statement; // backpatch
 
-      this.symTable["$parent$"][id.val] = { name: id.val, type: "Function", args: args, returnType: type.val, instruction: instruction };
+      this.symTable["$parent$"][id.val] = { name: id.val, type: "Function", args: args, returnType: type.val, statement: statement };
 
       this.symTable = this.symTable["$parent$"];
     }
@@ -512,16 +509,16 @@
       return { varNames: varNames, type: type, typeSpecs: typeSpecs };
     }
 
-    instructions() {
+    statements() {
       const res = [];
 
-      res.push(this.instruction());
+      res.push(this.statement());
 
       while(true) {
         const token = this.lexer.peek();
         if(token.type === "SEMICOLON") {
           this.lexer.consume("SEMICOLON");
-          res.push(this.instruction());
+          res.push(this.statement());
         } else {
           break;
         }
@@ -530,72 +527,72 @@
       return res;
     }
 
-    instruction() {
+    statement() {
       const token = this.lexer.peek();
       if(token.type === "end") return new NoOpNode();
 
       if(token.type === "begin") {
-        return this.instructionsBlock();
+        return this.statementsBlock();
       } else if(token.type === "if") {
-        return this.ifInstruction();
+        return this.ifStatement();
       } else if(token.type === "while") {
-        return this.whileInstruction();
+        return this.whileStatement();
       } else if(token.type === "writeln") {
-        return this.writelnInstruction();
+        return this.writelnStatement();
       } else {
-        return this.assignmentInstruction();
+        return this.assignmentStatement();
       }
     }
 
-    instructionsBlock() {
+    statementsBlock() {
       this.lexer.consume("begin");
 
-      const instructions = this.instructions();
+      const statements = this.statements();
 
       this.lexer.consume("end");
 
-      return new InstructionsBlockNode(instructions);
+      return new StatementsBlockNode(statements);
     }
 
-    ifInstruction() {
+    ifStatement() {
       const token = this.lexer.consume("if");
       const condition = this.expression();
       if(condition.type !== "Boolean") {
-        throw(`Invalid type for if instruction, expected Boolean, got ${condition.type} at line ${token.line}, col ${token.col}`);
+        throw(`Invalid type for if statement, expected Boolean, got ${condition.type} at line ${token.line}, col ${token.col}`);
       }
 
       this.lexer.consume("then");
-      const ifInstruction = this.instruction();
+      const ifStatement = this.statement();
 
       this.lexer.consume("else");
-      const elseInstruction = this.instruction();
+      const elseStatement = this.statement();
 
-      return new IfInstructionNode(condition, ifInstruction, elseInstruction);
+      return new IfStatementNode(condition, ifStatement, elseStatement);
     }
 
-    whileInstruction() {
+    whileStatement() {
       const token = this.lexer.consume("while");
       const condition = this.expression();
       if(condition.type !== "Boolean") {
-        throw(`Invalid type for while instruction, expected Boolean, got ${condition.type} at line ${token.line}, col ${token.col}`);
+        throw(`Invalid type for while statement, expected Boolean, got ${condition.type} at line ${token.line}, col ${token.col}`);
       }
 
       this.lexer.consume("do");
-      const instruction = this.instruction();
+      const statement = this.statement();
 
-      return new WhileInstructionNode(condition, instruction);
+      return new WhileStatementNode(condition, statement);
     }
 
-    writelnInstruction() {
+    writelnStatement() {
       const token = this.lexer.consume("writeln");
       this.lexer.consume("LEFT_PAREN");
       const expression = this.expression();
       this.lexer.consume("RIGHT_PAREN");
 
-      return new WritelnInstructionNode(expression);
+      return new WritelnStatementNode(expression);
     }
 
-    assignmentInstruction() {
+    assignmentStatement() {
       const varName = this.lexer.consume("ID");
 
       const variable = varName.val === this.symTable["$fun$"] ? this.symTable["$res$"] : this.symTable[varName.val];
@@ -623,7 +620,7 @@
           throw(`Incompatible types ${variable.type} and ${expression.type} at line ${assign.line}, col ${assign.col}`);
         }
 
-        return new AssignmentInstructionNode(variable, expression);
+        return new AssignmentStatementNode(variable, expression);
       }
     }
 
