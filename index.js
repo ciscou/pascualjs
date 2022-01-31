@@ -131,7 +131,7 @@
     simulate(ctx) {
       const ctx2 = {};
       for(let i=0; i<this.args.length; i++) {
-        ctx2[this.fun.args[i].name] = this.args[i].simulate(ctx);
+        ctx2[this.fun.params[i].name] = this.args[i].simulate(ctx);
       }
       // Object.entries(this.fun.varsDeclarations).forEach(([name, vd]) => ctx2[name] = initializeVariable(vd))
       this.fun.statement.simulate(ctx2);
@@ -410,7 +410,7 @@
 
       this.symTable = { "$parent$": this.symTable };
 
-      const args = [];
+      const params = [];
 
       while(true) {
         const token = this.lexer.peek();
@@ -422,7 +422,7 @@
             if(this.symTable[varName.val]) throw(`Variable ${varName.val} already exists! At line ${varName.line}, col ${varName.col}`);
 
             this.symTable[varName.val] = { name: varName.val, type: type.val, typeSpecs: typeSpecs };
-            args.push({ name: varName.val, type: type.val, typeSpecs: typeSpecs });
+            params.push({ name: varName.val, type: type.val, typeSpecs: typeSpecs });
           });
         } else {
           break;
@@ -448,7 +448,7 @@
         }
       }
 
-      this.symTable[id.val] = { name: id.val, type: "Function", args: args, returnType: type.val, varsDeclarations: varsDeclarations };
+      this.symTable[id.val] = { name: id.val, type: "Function", params: params, returnType: type.val, varsDeclarations: varsDeclarations };
       this.symTable["$fun$"] = id.val;
       this.symTable["$res$"] = { name: "$res$", type: type.val };
 
@@ -458,7 +458,7 @@
 
       this.symTable[id.val].statement = statement; // backpatch
 
-      this.symTable["$parent$"][id.val] = { name: id.val, type: "Function", args: args, returnType: type.val, statement: statement, varsDeclarations: varsDeclarations };
+      this.symTable["$parent$"][id.val] = { name: id.val, type: "Function", params: params, returnType: type.val, statement: statement, varsDeclarations: varsDeclarations };
 
       this.symTable = this.symTable["$parent$"];
     }
@@ -834,12 +834,12 @@
         this.lexer.consume("LEFT_PAREN");
         const args = this.expressions();
         this.lexer.consume("RIGHT_PAREN");
-        if(args.length !== sym.args.length) {
-          throw(`Invalid number of arguments, expected ${sym.args.length}, got ${args.length} at line ${token.line}, col ${token.col}`);
+        if(args.length !== sym.params.length) {
+          throw(`Invalid number of arguments, expected ${sym.params.length}, got ${args.length} at line ${token.line}, col ${token.col}`);
         }
         for(let i=0; i<args.length; i++) {
-          if(args[i].type !== sym.args[i].type) {
-            throw(`Invalid type for argument ${i+1}, expected ${sym.args[i].type}, got ${args[i].type} at line ${token.line}, col ${token.col}`);
+          if(args[i].type !== sym.params[i].type) {
+            throw(`Invalid type for argument ${i+1}, expected ${sym.params[i].type}, got ${args[i].type} at line ${token.line}, col ${token.col}`);
           }
         }
         return new FunctionCallNode(sym, args);
