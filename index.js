@@ -15,6 +15,8 @@
   const initializeVariable = (vd) => {
     if(vd.type === "Integer") {
       return 0;
+    } else if(vd.type === "Boolean") {
+      return false;
     } else if(vd.type === "Array") {
       return [];
     } else {
@@ -135,7 +137,7 @@
       for(let i=0; i<this.args.length; i++) {
         ctx2[this.fun.params[i].name] = this.args[i].simulate(ctx);
       }
-      // Object.entries(this.fun.varsDeclarations).forEach(([name, vd]) => ctx2[name] = initializeVariable(vd))
+      Object.entries(this.fun.varsDeclarations).forEach(([name, vd]) => ctx2[name] = initializeVariable(vd))
       this.fun.statement.simulate(ctx2);
       return ctx2["$res$"];
     }
@@ -563,6 +565,7 @@
         return this.ifStatement();
       } else if(token.type === "while") {
         return this.whileStatement();
+      // TODO: for loops
       } else if(token.type === "writeln") {
         return this.writelnStatement();
       } else {
@@ -590,6 +593,7 @@
       this.lexer.consume("then");
       const ifStatement = this.statement();
 
+      // TODO: optional else
       this.lexer.consume("else");
       const elseStatement = this.statement();
 
@@ -621,9 +625,11 @@
     assignmentStatement() {
       const varName = this.lexer.consume("ID");
 
+      // TODO: Should we use "$res$" for reading variable as well?
       const variable = varName.val === this.symTable["$fun$"] ? this.symTable["$res$"] : this.symTable[varName.val];
       if(!variable) throw(`Variable ${varName.val} doesn't exist! At line ${varName.line}, col ${varName.col}`);
 
+      // TODO: complex lhs (ary[i].record_field[3] := exp)
       const token = this.lexer.peek();
       if(token.type === "LEFT_BRACKET") {
         this.lexer.consume("LEFT_BRACKET");
