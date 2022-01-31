@@ -103,6 +103,7 @@
     }
 
     simulate(ctx) {
+      // TODO: bounds checks
       const index = this.index.simulate(ctx);
       return ctx[this.ary.name][index];
     }
@@ -116,6 +117,7 @@
     }
 
     simulate(ctx) {
+      // TODO: bounds checks
       const index = this.index.simulate(ctx);
       ctx[this.ary.name][index] = this.expression.simulate(ctx);
     }
@@ -387,6 +389,9 @@
       while(true) {
         const token = this.lexer.peek();
 
+        // TODO: constants
+        // TODO: procedures
+        // TODO: types (structs, pointers, custom types)
         if(token.type === "var") {
           varsDeclarations = this.varsDeclarations();
         } else if(token.type === "function") {
