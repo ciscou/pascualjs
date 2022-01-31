@@ -12,13 +12,25 @@
     ast.simulate({});
   });
 
+  const initializeVariable = (vd) => {
+    if(vd.type === "Integer") {
+      return 0;
+    } else if(vd.type === "Array") {
+      return [];
+    } else {
+      throw(`Cannot initialize variable of type ${vd.type}`);
+    }
+  }
+
   class ProgramNode {
-    constructor(name, statement) {
+    constructor(name, varsDeclarations, statement) {
       this.name = name;
+      this.varsDeclarations = varsDeclarations;
       this.statement = statement;
     }
 
     simulate(ctx) {
+      Object.entries(this.varsDeclarations).forEach(([name, vd]) => ctx[name] = initializeVariable(vd))
       this.statement.simulate(ctx);
     }
   }
@@ -105,7 +117,6 @@
 
     simulate(ctx) {
       const index = this.index.simulate(ctx);
-      if(!ctx[this.ary.name]) ctx[this.ary.name] = [];
       ctx[this.ary.name][index] = this.expression.simulate(ctx);
     }
   }
@@ -122,6 +133,7 @@
       for(let i=0; i<this.args.length; i++) {
         ctx2[this.fun.args[i].name] = this.args[i].simulate(ctx);
       }
+      // Object.entries(this.fun.varsDeclarations).forEach(([name, vd]) => ctx2[name] = initializeVariable(vd))
       this.fun.statement.simulate(ctx2);
       return ctx2["$res$"];
     }
@@ -370,11 +382,13 @@
       this.lexer.consume("SEMICOLON");
       this.symTable = {};
 
+      let varsDeclarations = {};
+
       while(true) {
         const token = this.lexer.peek();
 
         if(token.type === "var") {
-          this.varsDeclarations();
+          varsDeclarations = this.varsDeclarations();
         } else if(token.type === "function") {
           this.functionDeclaration();
         } else {
@@ -386,7 +400,7 @@
       this.lexer.consume("DOT");
       this.lexer.consume("EOF");
 
-      return new ProgramNode(id.val, statement);
+      return new ProgramNode(id.val, varsDeclarations, statement);
     }
 
     functionDeclaration() {
@@ -422,17 +436,19 @@
 
       this.lexer.consume("SEMICOLON");
 
+      let varsDeclarations = {};
+
       while(true) {
         const token = this.lexer.peek();
 
         if(token.type === "var") {
-          this.varsDeclarations();
+          varsDeclarations = this.varsDeclarations();
         } else {
           break
         }
       }
 
-      this.symTable[id.val] = { name: id.val, type: "Function", args: args, returnType: type.val };
+      this.symTable[id.val] = { name: id.val, type: "Function", args: args, returnType: type.val, varsDeclarations: varsDeclarations };
       this.symTable["$fun$"] = id.val;
       this.symTable["$res$"] = { name: "$res$", type: type.val };
 
@@ -442,12 +458,14 @@
 
       this.symTable[id.val].statement = statement; // backpatch
 
-      this.symTable["$parent$"][id.val] = { name: id.val, type: "Function", args: args, returnType: type.val, statement: statement };
+      this.symTable["$parent$"][id.val] = { name: id.val, type: "Function", args: args, returnType: type.val, statement: statement, varsDeclarations: varsDeclarations };
 
       this.symTable = this.symTable["$parent$"];
     }
 
     varsDeclarations() {
+      const res = {};
+
       const token = this.lexer.peek();
       if(token.type === "var") {
         this.lexer.consume("var");
@@ -462,6 +480,7 @@
               if(this.symTable[varName.val]) throw(`Variable ${varName.val} already exists! At line ${varName.line}, col ${varName.col}`);
 
               this.symTable[varName.val] = { name: varName.val, type: type.val, typeSpecs: typeSpecs };
+              res[varName.val] = { name: varName.val, type: type.val, typeSpecs: typeSpecs };
             });
 
             this.lexer.consume("SEMICOLON");
@@ -470,6 +489,8 @@
           }
         }
       }
+
+      return res;
     }
 
     varDeclaration() {
