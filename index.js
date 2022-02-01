@@ -25,14 +25,16 @@
   }
 
   class ProgramNode {
-    constructor(name, varsDeclarations, statement) {
+    constructor(name, constsDeclarations, varsDeclarations, statement) {
       this.name = name;
+      this.constsDeclarations = constsDeclarations;
       this.varsDeclarations = varsDeclarations;
       this.statement = statement;
     }
 
     simulate(ctx) {
-      Object.entries(this.varsDeclarations).forEach(([name, vd]) => ctx[name] = initializeVariable(vd))
+      Object.entries(this.constsDeclarations).forEach(([name, vd]) => ctx[name] = vd.value);
+      Object.entries(this.varsDeclarations).forEach(([name, vd]) => ctx[name] = initializeVariable(vd));
       this.statement.simulate(ctx);
     }
   }
@@ -134,6 +136,7 @@
 
     simulate(ctx) {
       const ctx2 = {};
+      Object.entries(ctx).forEach(([k, v]) => { ctx2[k] = v });
       for(let i=0; i<this.args.length; i++) {
         ctx2[this.fun.params[i].name] = this.args[i].simulate(ctx);
       }
@@ -387,15 +390,17 @@
       this.symTable = {};
 
       let varsDeclarations = {};
+      let constsDeclarations = {};
 
       while(true) {
         const token = this.lexer.peek();
 
-        // TODO: constants
         // TODO: procedures
         // TODO: types (structs, pointers, custom types)
         if(token.type === "var") {
           varsDeclarations = this.varsDeclarations();
+        } else if(token.type === "const") {
+          constsDeclarations = this.constsDeclarations();
         } else if(token.type === "function") {
           this.functionDeclaration();
         } else {
@@ -407,7 +412,7 @@
       this.lexer.consume("DOT");
       this.lexer.consume("EOF");
 
-      return new ProgramNode(id.val, varsDeclarations, statement);
+      return new ProgramNode(id.val, constsDeclarations, varsDeclarations, statement);
     }
 
     functionDeclaration() {
@@ -470,6 +475,78 @@
       this.symTable = this.symTable["$parent$"];
     }
 
+    constsDeclarations() {
+      const res = {};
+
+      const token = this.lexer.peek();
+      if(token.type === "const") {
+        this.lexer.consume("const");
+
+        while(true) {
+          const token = this.lexer.peek();
+
+          if(token.type === "ID") {
+            const { constNames, type, typeSpecs, value } = this.constDeclaration();
+
+            constNames.forEach(constName => {
+              if(this.symTable[constName.val]) throw(`Constant ${constName.val} already exists! At line ${constName.line}, col ${constName.col}`);
+
+              this.symTable[constName.val] = { name: constName.val, type: type.val, typeSpecs: typeSpecs, value: value };
+              res[constName.val] = { name: constName.val, type: type.val, typeSpecs: typeSpecs, value: value };
+            });
+
+            this.lexer.consume("SEMICOLON");
+          } else {
+            break;
+          }
+        }
+      }
+
+      return res;
+    }
+
+    constDeclaration() {
+      const constNames = [];
+      constNames.push(this.lexer.consume("ID"));
+
+      while(true) {
+        const token = this.lexer.peek();
+
+        if(token.type === "COMMA") {
+          this.lexer.consume("COMMA")
+          constNames.push(this.lexer.consume("ID"));
+        } else {
+          break
+        }
+      }
+
+      this.lexer.consume("COLON");
+
+      const type = this.lexer.consume("TYPE");
+      const typeSpecs = {};
+
+      if(type.val === "Array") {
+        this.lexer.consume("LEFT_BRACKET");
+        const low = this.lexer.consume("INTEGER_LITERAL");
+        this.lexer.consume("DOTDOT");
+        const high = this.lexer.peek().type === "ID" ? this.lexer.consume("ID") : this.lexer.consume("INTEGER_LITERAL");
+        this.lexer.consume("RIGHT_BRACKET");
+        this.lexer.consume("of");
+        const itemType = this.lexer.consume("TYPE");
+
+        typeSpecs.low = parseInt(low.val);
+        typeSpecs.high = high.type === "ID" ? this.findConstant(high).value : parseInt(high.val);
+        typeSpecs.itemType = itemType.val;
+      }
+
+      this.lexer.consume("EQ");
+
+      // TODO allow other types of constants, also maybe compute expressions
+      const value = this.lexer.consume("INTEGER_LITERAL");
+
+      return { constNames: constNames, type: type, typeSpecs: typeSpecs, value: parseInt(value.val) };
+    }
+
     varsDeclarations() {
       const res = {};
 
@@ -524,13 +601,13 @@
         this.lexer.consume("LEFT_BRACKET");
         const low = this.lexer.consume("INTEGER_LITERAL");
         this.lexer.consume("DOTDOT");
-        const high = this.lexer.consume("INTEGER_LITERAL");
+        const high = this.lexer.peek().type === "ID" ? this.lexer.consume("ID") : this.lexer.consume("INTEGER_LITERAL");
         this.lexer.consume("RIGHT_BRACKET");
         this.lexer.consume("of");
         const itemType = this.lexer.consume("TYPE");
 
         typeSpecs.low = parseInt(low.val);
-        typeSpecs.high = parseInt(high.val);
+        typeSpecs.high = high.type === "ID" ? this.findConstant(high).value : parseInt(high.val);
         typeSpecs.itemType = itemType.val;
       }
 
@@ -625,7 +702,6 @@
     assignmentStatement() {
       const varName = this.lexer.consume("ID");
 
-      // TODO: Should we use "$res$" for reading variable as well?
       const variable = varName.val === this.symTable["$fun$"] ? this.symTable["$res$"] : this.symTable[varName.val];
       if(!variable) throw(`Variable ${varName.val} doesn't exist! At line ${varName.line}, col ${varName.col}`);
 
@@ -808,12 +884,7 @@
         }
         return new IntegerUnarySubNode(expression);
       } else if(token.type === "ID") {
-        let sym;
-        let table = this.symTable;
-        while(!sym && table) {
-          sym = table[token.val];
-          table = table["$parent$"];
-        }
+        const sym = this.findSymbol(token);
         if(!sym) throw(`Variable ${token.val} doesn't exist! At line ${token.line}, col ${token.col}`);
         return this.variableTerm(sym);
       } else if(token.type === "LEFT_PAREN") {
@@ -866,12 +937,30 @@
         }
         return new ArrayReadNode(sym, index);
       } else {
-        return new VariableNode(sym);
+        const variable = sym.name === this.symTable["$fun$"] ? this.symTable["$res$"] : sym;
+        return new VariableNode(variable);
       }
+    }
+
+    findSymbol(token) {
+      let table = this.symTable;
+      while(table) {
+        if(table.hasOwnProperty(token.val)) {
+          return table[token.val];
+        }
+        table = table["$parent$"];
+      }
+    }
+
+    findConstant(token) {
+      const sym = this.findSymbol(token);
+      if(!sym) throw(`Constant ${token.val} doesn't exist! At line ${token.line}, col ${token.col}`);
+      if(!sym.hasOwnProperty("value")) throw(`Symbol ${token.val} is not a constant! At line ${token.line}, col ${token.col}`);
+      return sym;
     }
   }
 
-  const KEYWORDS = ["program", "begin", "end", "var", "of", "if", "then", "else", "while", "do", "and", "or", "not", "true", "false", "mod", "div", "writeln", "function"];
+  const KEYWORDS = ["program", "begin", "end", "const", "var", "of", "if", "then", "else", "while", "do", "and", "or", "not", "true", "false", "mod", "div", "writeln", "function"];
   const TYPES = ["Integer", "Boolean", "Array"];
 
   class Lexer {

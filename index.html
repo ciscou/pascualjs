@@ -10,52 +10,50 @@
       <form id="form">
         <textarea name="code" id="code" rows="16" cols="60">program minmax;
 
-function find_min(arr: Array[0..9] of Integer): Integer;
-var i, res: Integer;
+const LAST_INDEX: Integer = 9;
+
+function min(a, b: Integer): Integer;
 begin
-  i := 0;
-  res := arr[i];
-
-  while i &lt; 10 do
-  begin
-    if arr[i] &lt; res then
-      res := arr[i]
-    else
-      begin end;
-
-    i := i + 1
-  end;
-
-  find_min := res
+  if a &lt; b then min := a else min := b
 end;
 
-function find_max(arr: Array[0..9] of Integer): Integer;
-var i, res: Integer;
+function max(a, b: Integer): Integer;
+begin
+  if a &gt; b then max := a else max := b
+end;
+
+function find_min(arr: Array[0..LAST_INDEX] of Integer): Integer;
+var i: Integer;
 begin
   i := 0;
-  res := arr[i];
+  find_min := arr[i];
 
-  while i &lt; 10 do
+  while i &lt;= LAST_INDEX do
   begin
-    if arr[i] &gt; res then
-      res := arr[i]
-    else
-      begin end;
+    find_min := min(find_min, arr[i]);
 
     i := i + 1
-  end;
+  end
+end;
 
-  find_max := res
+function find_max(arr: Array[0..LAST_INDEX] of Integer): Integer;
+var i: Integer;
+begin
+  i := 0;
+  find_max := arr[i];
+
+  while i &lt;= LAST_INDEX do
+  begin
+    find_max := max(find_max, arr[i]);
+
+    i := i + 1
+  end
 end;
 
 var
-  cap: Integer;
-  arr: Array[0..9] of Integer;
-  min, max, i: Integer;
+  arr: Array[0..LAST_INDEX] of Integer;
 
 begin
-  cap := 10;
-
   arr[0] := 0;
   arr[1] := -1;
   arr[2] := 42;
@@ -67,11 +65,8 @@ begin
   arr[8] := 100;
   arr[9] := 33;
 
-  min := find_min(arr);
-  max := find_max(arr);
-
-  writeln(min);
-  writeln(max)
+  writeln(find_min(arr));
+  writeln(find_max(arr))
 end.</textarea>
         <input type="submit" name="Submit" id="submit" value="submit" />
       </form>
