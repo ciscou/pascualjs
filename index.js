@@ -212,6 +212,17 @@
     }
   }
 
+  class StringLiteralNode {
+    constructor(integer) {
+      this.integer = integer
+      this.type = "String";
+    }
+
+    simulate(ctx) {
+      return this.integer;
+    }
+  }
+
   class IntegerLiteralNode {
     constructor(integer) {
       this.integer = integer
@@ -872,6 +883,8 @@
 
       if(token.type === "INTEGER_LITERAL") {
         return new IntegerLiteralNode(parseInt(token.val));
+      } else if(token.type === "STRING_LITERAL") {
+        return new StringLiteralNode(token.val);
       } else if(token.type === "ADD") {
         const expression = this.expression();
         if(expression.type !== "Integer") {
@@ -1099,6 +1112,18 @@
         token.val = "<";
         this.offset++;
         token.type = "GT";
+      } else if(this.input[this.offset] === "\"") {
+        this.offset++;
+        while(this.offset < this.input.length && this.input[this.offset] !== "\"") {
+          token.val += this.input[this.offset];
+          this.offset++;
+        }
+        if(this.offset < this.input.length && this.input[this.offset] === "\"") {
+          this.offset++;
+          token.type = "STRING_LITERAL";
+        } else {
+          throw(`Missing " at line ${this.line}, col ${this.col}`);
+        }
       } else {
         throw(`Unknown token ${this.input[this.offset]} at line ${this.line}, col ${this.col}`);
       }

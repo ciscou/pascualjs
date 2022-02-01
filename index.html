@@ -8,65 +8,28 @@
   <body>
     <body>
       <form id="form">
-        <textarea name="code" id="code" rows="16" cols="60">program minmax;
-
-const LAST_INDEX: Integer = 9;
-
-function min(a, b: Integer): Integer;
-begin
-  if a &lt; b then min := a else min := b
-end;
-
-function max(a, b: Integer): Integer;
-begin
-  if a &gt; b then max := a else max := b
-end;
-
-function find_min(arr: Array[0..LAST_INDEX] of Integer): Integer;
-var i: Integer;
-begin
-  i := 0;
-  find_min := arr[i];
-
-  while i &lt;= LAST_INDEX do
-  begin
-    find_min := min(find_min, arr[i]);
-
-    i := i + 1
-  end
-end;
-
-function find_max(arr: Array[0..LAST_INDEX] of Integer): Integer;
-var i: Integer;
-begin
-  i := 0;
-  find_max := arr[i];
-
-  while i &lt;= LAST_INDEX do
-  begin
-    find_max := max(find_max, arr[i]);
-
-    i := i + 1
-  end
-end;
+        <textarea name="code" id="code" rows="16" cols="60">program fizzbuz;
 
 var
-  arr: Array[0..LAST_INDEX] of Integer;
+  n, m: Integer;
 
 begin
-  arr[0] := 0;
-  arr[1] := -1;
-  arr[2] := 42;
-  arr[3] := 69;
-  arr[4] := -420;
-  arr[5] := 17;
-  arr[6] := 1;
-  arr[7] := 23;
-  arr[8] := 100;
-  arr[9] := 33;
+  m := 100;
+  n := 1;
 
-  writeln(find_min(arr));
-  writeln(find_max(arr))
+  while n &lt;= m do
+  begin
+    if n mod 15 = 0 then
+      writeln("FizzBuzz!")
+    else if n mod 3 = 0 then
+      writeln("Fizz!")
+    else if n mod 5 = 0 then
+      writeln("Buzz!")
+    else
+      writeln(n);
+
+    n := n + 1
+  end
 end.</textarea>
         <input type="submit" name="Submit" id="submit" value="submit" />
       </form>
