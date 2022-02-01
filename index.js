@@ -396,7 +396,7 @@
         const token = this.lexer.peek();
 
         // TODO: procedures
-        // TODO: types (structs, pointers, custom types)
+        // TODO: types (strings, structs, pointers, custom types)
         if(token.type === "var") {
           varsDeclarations = this.varsDeclarations();
         } else if(token.type === "const") {
@@ -541,7 +541,7 @@
 
       this.lexer.consume("EQ");
 
-      // TODO allow other types of constants, also maybe compute expressions
+      // TODO: allow other types of constants, also maybe compute expressions
       const value = this.lexer.consume("INTEGER_LITERAL");
 
       return { constNames: constNames, type: type, typeSpecs: typeSpecs, value: parseInt(value.val) };
@@ -598,6 +598,7 @@
       const typeSpecs = {};
 
       if(type.val === "Array") {
+        // TODO: support dynamic arrays for function/procedure params
         this.lexer.consume("LEFT_BRACKET");
         const low = this.lexer.consume("INTEGER_LITERAL");
         this.lexer.consume("DOTDOT");
