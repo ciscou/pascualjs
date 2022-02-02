@@ -19,9 +19,9 @@ begin
 end;
 
 const
-  N_COINS: Integer = 4;
-  COINS: Array[0..N_COINS-1] of Integer = (1, 4, 7, 11);
-  TARGET: Integer = 123;
+  N_COINS = 4;
+  COINS: Array[1..N_COINS] of Integer = (1, 4, 7, 11);
+  TARGET = 123;
 
 var
   dp: Array[0..TARGET] of Integer;
@@ -29,24 +29,24 @@ var
 
 begin
   for amount := 0 to TARGET do
-    dp[amount] := 999999;
+    dp[amount] := 32767;
 
   dp[0] := 0;
 
   for amount := 1 to TARGET do
   begin
-    for coin := 0 to N_COINS-1 do
+    for coin := 1 to N_COINS do
     begin
       rest := amount - COINS[coin];
       if rest &gt;= 0 then
-        dp[amount] := min(dp[amount], 1 + dp[rest])
+        dp[amount] := min(dp[amount], dp[rest] + 1)
       else
         begin end
     end
   end;
 
   for amount := 0 to TARGET do
-    writeln("you need", dp[amount], "coins to sum", amount)
+    writeln('you need ', dp[amount], ' coins to sum ', amount)
 end.</textarea>
         <input type="submit" name="Submit" id="submit" value="submit" />
       </form>
