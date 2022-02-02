@@ -99,12 +99,12 @@
   }
 
   class WritelnStatementNode {
-    constructor(expression) {
-      this.expression = expression;
+    constructor(expressions) {
+      this.expressions = expressions;
     }
 
     simulate(ctx) {
-      console.log(this.expression.simulate(ctx));
+      console.log(...this.expressions.map(expression => expression.simulate(ctx)));
     }
   }
 
@@ -759,10 +759,10 @@
     writelnStatement() {
       const token = this.lexer.consume("writeln");
       this.lexer.consume("LEFT_PAREN");
-      const expression = this.expression();
+      const expressions = this.expressions();
       this.lexer.consume("RIGHT_PAREN");
 
-      return new WritelnStatementNode(expression);
+      return new WritelnStatementNode(expressions);
     }
 
     assignmentStatement() {

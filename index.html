@@ -46,11 +46,12 @@ begin
       if rest &gt;= 0 then
         dp[amount] := min(dp[amount], 1 + dp[rest])
       else
-        begin end;
-    end;
+        begin end
+    end
   end;
 
-  writeln(dp[TARGET])
+  for amount := 0 to TARGET do
+    writeln("you need", dp[amount], "coins to sum", amount)
 end.</textarea>
         <input type="submit" name="Submit" id="submit" value="submit" />
       </form>
