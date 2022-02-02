@@ -8,55 +8,49 @@
   <body>
     <body>
       <form id="form">
-        <textarea name="code" id="code" rows="16" cols="60">program minmax;
-
-const CAP: Integer = 5 * 2;
+        <textarea name="code" id="code" rows="16" cols="60">program coin_change;
 
 function min(a, b: Integer): Integer;
 begin
-  if a &lt; b then min := a else min := b
+  if a &lt; b then
+    min := a
+  else
+    min := b
 end;
 
-function max(a, b: Integer): Integer;
-begin
-  if a &gt; b then max := a else max := b
-end;
-
-function find_min(arr: Array[0..CAP-1] of Integer): Integer;
-var i: Integer;
-begin
-  find_min := arr[0];
-
-  for i := 1 to CAP - 1 do
-    find_min := min(find_min, arr[i])
-end;
-
-function find_max(arr: Array[0..CAP-1] of Integer): Integer;
-var i: Integer;
-begin
-  find_max := arr[0];
-
-  for i := 1 to CAP - 1 do
-    find_max := max(find_max, arr[i])
-end;
+const
+  N_COINS: Integer = 4;
+  TARGET: Integer = 123;
 
 var
-  arr: Array[0..CAP-1] of Integer;
+  coins: Array[0..N_COINS-1] of Integer;
+  dp: Array[0..TARGET] of Integer;
+  coin, amount, rest: Integer;
 
 begin
-  arr[0] := 0;
-  arr[1] := -1;
-  arr[2] := 42;
-  arr[3] := 69;
-  arr[4] := -420;
-  arr[5] := 17;
-  arr[6] := 1;
-  arr[7] := 23;
-  arr[8] := 100;
-  arr[9] := 33;
+  coins[0] := 1;
+  coins[1] := 4;
+  coins[2] := 7;
+  coins[3] := 11;
 
-  writeln(find_min(arr));
-  writeln(find_max(arr))
+  for amount := 0 to TARGET do
+    dp[amount] := 999999;
+
+  dp[0] := 0;
+
+  for amount := 1 to TARGET do
+  begin
+    for coin := 0 to N_COINS-1 do
+    begin
+      rest := amount - coins[coin];
+      if rest &gt;= 0 then
+        dp[amount] := min(dp[amount], 1 + dp[rest])
+      else
+        begin end;
+    end;
+  end;
+
+  writeln(dp[TARGET])
 end.</textarea>
         <input type="submit" name="Submit" id="submit" value="submit" />
       </form>
