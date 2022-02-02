@@ -845,9 +845,12 @@
       this.lexer.consume("then");
       const ifStatement = this.statement();
 
-      // TODO: optional else
-      this.lexer.consume("else");
-      const elseStatement = this.statement();
+      let elseStatement = new NoOpNode();
+      const elseToken = this.lexer.peek();
+      if(elseToken.type === "else") {
+        this.lexer.consume("else");
+        elseStatement = this.statement();
+      }
 
       return new IfStatementNode(condition, ifStatement, elseStatement);
     }
