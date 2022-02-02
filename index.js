@@ -399,6 +399,7 @@
       const id = this.lexer.consume("ID");
       this.lexer.consume("SEMICOLON");
       this.symTable = {};
+      this.context = {};
 
       let varsDeclarations = {};
       let constsDeclarations = {};
@@ -432,6 +433,7 @@
       this.lexer.consume("LEFT_PAREN");
 
       this.symTable = { "$parent$": this.symTable };
+      this.context = { ...this.context, "$parent$": this.context };
 
       const params = [];
 
@@ -484,6 +486,7 @@
       this.symTable["$parent$"][id.val] = { name: id.val, type: "Function", params: params, returnType: type.val, statement: statement, varsDeclarations: varsDeclarations };
 
       this.symTable = this.symTable["$parent$"];
+      this.context = this.context["$parent$"];
     }
 
     constsDeclarations() {
@@ -503,6 +506,7 @@
               if(this.symTable[constName.val]) throw(`Constant ${constName.val} already exists! At line ${constName.line}, col ${constName.col}`);
 
               this.symTable[constName.val] = { name: constName.val, type: type.val, typeSpecs: typeSpecs, value: value };
+              this.context[constName.val] = value;
               res[constName.val] = { name: constName.val, type: type.val, typeSpecs: typeSpecs, value: value };
             });
 
@@ -538,24 +542,26 @@
 
       if(type.val === "Array") {
         this.lexer.consume("LEFT_BRACKET");
-        const low = this.lexer.consume("INTEGER_LITERAL");
+        const low = this.expression();
         this.lexer.consume("DOTDOT");
-        const high = this.lexer.peek().type === "ID" ? this.lexer.consume("ID") : this.lexer.consume("INTEGER_LITERAL");
+        const high = this.expression();
         this.lexer.consume("RIGHT_BRACKET");
         this.lexer.consume("of");
         const itemType = this.lexer.consume("TYPE");
 
-        typeSpecs.low = parseInt(low.val);
-        typeSpecs.high = high.type === "ID" ? this.findConstant(high).value : parseInt(high.val);
+        // TODO: check low and high are integers
+        typeSpecs.low = low.simulate(this.context);
+        typeSpecs.high = high.simulate(this.context);
         typeSpecs.itemType = itemType.val;
       }
 
       this.lexer.consume("EQ");
 
-      // TODO: allow other types of constants, also maybe compute expressions
-      const value = this.lexer.consume("INTEGER_LITERAL");
+      const value = this.expression().simulate(this.context);
 
-      return { constNames: constNames, type: type, typeSpecs: typeSpecs, value: parseInt(value.val) };
+      // TODO: check constant type and expression type match
+
+      return { constNames: constNames, type: type, typeSpecs: typeSpecs, value: value };
     }
 
     varsDeclarations() {
@@ -611,15 +617,16 @@
       if(type.val === "Array") {
         // TODO: support dynamic arrays for function/procedure params
         this.lexer.consume("LEFT_BRACKET");
-        const low = this.lexer.consume("INTEGER_LITERAL");
+        const low = this.expression();
         this.lexer.consume("DOTDOT");
-        const high = this.lexer.peek().type === "ID" ? this.lexer.consume("ID") : this.lexer.consume("INTEGER_LITERAL");
+        const high = this.expression();
         this.lexer.consume("RIGHT_BRACKET");
         this.lexer.consume("of");
         const itemType = this.lexer.consume("TYPE");
 
-        typeSpecs.low = parseInt(low.val);
-        typeSpecs.high = high.type === "ID" ? this.findConstant(high).value : parseInt(high.val);
+        // TODO: check low and high are integers
+        typeSpecs.low = low.simulate(this.context);
+        typeSpecs.high = high.simulate(this.context);
         typeSpecs.itemType = itemType.val;
       }
 
