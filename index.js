@@ -581,6 +581,31 @@
       this.context = this.context["$parent$"];
     }
 
+    typeSpecs(type) {
+      const typeSpecs = {};
+
+      if(type.val === "Array") {
+        // TODO: support dynamic arrays for function/procedure params
+        this.lexer.consume("LEFT_BRACKET");
+        const low = this.expression();
+        this.lexer.consume("DOTDOT");
+        const high = this.expression();
+        this.lexer.consume("RIGHT_BRACKET");
+        this.lexer.consume("of");
+        const itemType = this.lexer.consume("TYPE");
+
+        if(low.type !== "Integer" || high.type !== "Integer") {
+          throw(`Array bounds should be of type Integer at line ${this.lexer.line}, col ${this.lexer.col}`);
+        }
+
+        typeSpecs.low = low.simulate(this.context);
+        typeSpecs.high = high.simulate(this.context);
+        typeSpecs.itemType = itemType.val;
+      }
+
+      return typeSpecs;
+    }
+
     constsDeclarations() {
       const res = {};
 
@@ -635,25 +660,7 @@
         this.lexer.consume("COLON");
 
         type = this.lexer.consume("TYPE");
-        typeSpecs = {};
-
-        if(type.val === "Array") {
-          this.lexer.consume("LEFT_BRACKET");
-          const low = this.expression();
-          this.lexer.consume("DOTDOT");
-          const high = this.expression();
-          this.lexer.consume("RIGHT_BRACKET");
-          this.lexer.consume("of");
-          const itemType = this.lexer.consume("TYPE");
-
-          if(low.type !== "Integer" || high.type !== "Integer") {
-            throw(`Array bounds should be of type Integer at line ${this.lexer.line}, col ${this.lexer.col}`);
-          }
-
-          typeSpecs.low = low.simulate(this.context);
-          typeSpecs.high = high.simulate(this.context);
-          typeSpecs.itemType = itemType.val;
-        }
+        typeSpecs = this.typeSpecs(type);
       }
 
       this.lexer.consume("EQ");
@@ -743,26 +750,7 @@
       this.lexer.consume("COLON");
 
       const type = this.lexer.consume("TYPE");
-      const typeSpecs = {};
-
-      if(type.val === "Array") {
-        // TODO: support dynamic arrays for function/procedure params
-        this.lexer.consume("LEFT_BRACKET");
-        const low = this.expression();
-        this.lexer.consume("DOTDOT");
-        const high = this.expression();
-        this.lexer.consume("RIGHT_BRACKET");
-        this.lexer.consume("of");
-        const itemType = this.lexer.consume("TYPE");
-
-        if(low.type !== "Integer" || high.type !== "Integer") {
-          throw(`Array bounds should be of type Integer at line ${this.lexer.line}, col ${this.lexer.col}`);
-        }
-
-        typeSpecs.low = low.simulate(this.context);
-        typeSpecs.high = high.simulate(this.context);
-        typeSpecs.itemType = itemType.val;
-      }
+      const typeSpecs = this.typeSpecs(type);
 
       return { varNames: varNames, type: type, typeSpecs: typeSpecs };
     }
