@@ -16,7 +16,6 @@ const
 
 var
   i: Integer;
-  res: Boolean;
 
 function split(arr: Array[1..MAX] of Integer; start, stop: Integer): Integer;
 var
@@ -47,28 +46,25 @@ begin
   split := right
 end;
 
-function quicksortrecur(arr: Array[1..MAX] of Integer; start, stop: Integer): Boolean;
+procedure quicksortrecur(arr: Array[1..MAX] of Integer; start, stop: Integer);
   var
     splitpt: Integer;
-    kk: Boolean;
 
   begin
     if start &lt; stop then begin
       splitpt := split(arr, start, stop);
-      kk := quicksortrecur(arr, start, splitpt-1);
-      kk := quicksortrecur(arr, splitpt+1, stop);
+      quicksortrecur(arr, start, splitpt-1);
+      quicksortrecur(arr, splitpt+1, stop);
     end else begin end;
-
-  quicksortrecur := true;
 end;
 
-function quicksort(arr: Array[1..MAX] of Integer): Boolean;
+procedure quicksort(arr: Array[1..MAX] of Integer);
 begin
-  quicksort := quicksortrecur(arr, 1, MAX);
+  quicksortrecur(arr, 1, MAX);
 end;
 
 begin
-  res := quicksort(ARR);
+  quicksort(ARR);
   for i := 1 to MAX do
     writeln(ARR[i])
 end.</textarea>

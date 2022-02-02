@@ -167,6 +167,23 @@
     }
   }
 
+  class ProcedureCallNode {
+    constructor(proc, args) {
+      this.proc = proc;
+      this.args = args;
+    }
+
+    simulate(ctx) {
+      const ctx2 = {};
+      Object.entries(ctx).forEach(([k, v]) => { ctx2[k] = v });
+      for(let i=0; i<this.args.length; i++) {
+        ctx2[this.proc.params[i].name] = this.args[i].simulate(ctx);
+      }
+      Object.entries(this.proc.varsDeclarations).forEach(([name, vd]) => ctx2[name] = initializeVariable(vd))
+      this.proc.statement.simulate(ctx2);
+    }
+  }
+
   class NoOpNode {
     simulate(ctx) {
       // well... no-op. surprise!
@@ -428,7 +445,6 @@
       while(true) {
         const token = this.lexer.peek();
 
-        // TODO: procedures
         // TODO: types (strings, structs, pointers, custom types)
         if(token.type === "var") {
           varsDeclarations = this.varsDeclarations();
@@ -436,6 +452,8 @@
           constsDeclarations = this.constsDeclarations();
         } else if(token.type === "function") {
           this.functionDeclaration();
+        } else if(token.type === "procedure") {
+          this.procedureDeclaration();
         } else {
           break
         }
@@ -456,7 +474,7 @@
       this.symTable = { "$parent$": this.symTable };
       this.context = { ...this.context, "$parent$": this.context };
 
-      // TODO by-var vs by-ref params
+      // TODO: by-var vs by-ref params
       const params = [];
 
       while(true) {
@@ -511,6 +529,69 @@
       this.symTable[id.val].statement = statement; // backpatch
 
       this.symTable["$parent$"][id.val] = { name: id.val, type: "Function", params: params, returnType: type.val, statement: statement, varsDeclarations: varsDeclarations };
+
+      this.symTable = this.symTable["$parent$"];
+      this.context = this.context["$parent$"];
+    }
+
+    procedureDeclaration() {
+      this.lexer.consume("procedure");
+      const id = this.lexer.consume("ID");
+      this.lexer.consume("LEFT_PAREN");
+
+      this.symTable = { "$parent$": this.symTable };
+      this.context = { ...this.context, "$parent$": this.context };
+
+      // TODO: by-var vs by-ref params
+      const params = [];
+
+      while(true) {
+        const token = this.lexer.peek();
+
+        if(token.type === "SEMICOLON") {
+          this.lexer.consume("SEMICOLON");
+          continue;
+        }
+
+        if(token.type === "ID") {
+          const { varNames, type, typeSpecs } = this.varDeclaration();
+
+          varNames.forEach(varName => {
+            if(this.symTable[varName.val]) throw(`Variable ${varName.val} already exists! At line ${varName.line}, col ${varName.col}`);
+
+            this.symTable[varName.val] = { name: varName.val, type: type.val, typeSpecs: typeSpecs };
+            params.push({ name: varName.val, type: type.val, typeSpecs: typeSpecs });
+          });
+        } else {
+          break;
+        }
+      }
+
+      this.lexer.consume("RIGHT_PAREN");
+
+      this.lexer.consume("SEMICOLON");
+
+      let varsDeclarations = {};
+
+      while(true) {
+        const token = this.lexer.peek();
+
+        if(token.type === "var") {
+          varsDeclarations = this.varsDeclarations();
+        } else {
+          break
+        }
+      }
+
+      this.symTable[id.val] = { name: id.val, type: "Procedure", params: params, varsDeclarations: varsDeclarations };
+
+      const statement = this.statementsBlock();
+
+      this.lexer.consume("SEMICOLON");
+
+      this.symTable[id.val].statement = statement; // backpatch
+
+      this.symTable["$parent$"][id.val] = { name: id.val, type: "Procedure", params: params, statement: statement, varsDeclarations: varsDeclarations };
 
       this.symTable = this.symTable["$parent$"];
       this.context = this.context["$parent$"];
@@ -735,7 +816,12 @@
       } else if(token.type === "writeln") {
         return this.writelnStatement();
       } else {
-        return this.assignmentStatement();
+        const sym = this.findSymbol(token);
+        if(sym && sym.type === "Procedure") {
+          return this.procedureCall();
+        } else {
+          return this.assignmentStatement();
+        }
       }
     }
 
@@ -806,6 +892,27 @@
       this.lexer.consume("RIGHT_PAREN");
 
       return new WritelnStatementNode(expressions);
+    }
+
+    procedureCall() {
+      const procedureName = this.lexer.consume("ID");
+      const sym = this.findSymbol(procedureName);
+
+      if(sym.type !== "Procedure") {
+        throw(`${sym.name} is not a procedure at line ${token.line}, col ${token.col}`);
+      }
+      this.lexer.consume("LEFT_PAREN");
+      const args = this.expressions();
+      this.lexer.consume("RIGHT_PAREN");
+      if(args.length !== sym.params.length) {
+        throw(`Invalid number of arguments, expected ${sym.params.length}, got ${args.length} at line ${token.line}, col ${token.col}`);
+      }
+      for(let i=0; i<args.length; i++) {
+        if(args[i].type !== sym.params[i].type) {
+          throw(`Invalid type for argument ${i+1}, expected ${sym.params[i].type}, got ${args[i].type} at line ${token.line}, col ${token.col}`);
+        }
+      }
+      return new ProcedureCallNode(sym, args);
     }
 
     assignmentStatement() {
@@ -1071,7 +1178,7 @@
     }
   }
 
-  const KEYWORDS = ["program", "begin", "end", "const", "var", "of", "if", "then", "else", "while", "for", "to", "do", "and", "or", "not", "true", "false", "mod", "div", "writeln", "function"];
+  const KEYWORDS = ["program", "begin", "end", "const", "var", "of", "if", "then", "else", "while", "for", "to", "do", "and", "or", "not", "true", "false", "mod", "div", "writeln", "function", "procedure"];
   const TYPES = ["Integer", "Boolean", "Array"];
 
   class Lexer {
