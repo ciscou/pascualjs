@@ -10,7 +10,7 @@
       <form id="form">
         <textarea name="code" id="code" rows="16" cols="60">program minmax;
 
-const LAST_INDEX: Integer = 9;
+const CAP: Integer = 5 * 2;
 
 function min(a, b: Integer): Integer;
 begin
@@ -22,36 +22,26 @@ begin
   if a &gt; b then max := a else max := b
 end;
 
-function find_min(arr: Array[0..LAST_INDEX] of Integer): Integer;
+function find_min(arr: Array[0..CAP-1] of Integer): Integer;
 var i: Integer;
 begin
-  i := 0;
-  find_min := arr[i];
+  find_min := arr[0];
 
-  while i &lt;= LAST_INDEX do
-  begin
-    find_min := min(find_min, arr[i]);
-
-    i := i + 1
-  end
+  for i := 1 to CAP - 1 do
+    find_min := min(find_min, arr[i])
 end;
 
-function find_max(arr: Array[0..LAST_INDEX] of Integer): Integer;
+function find_max(arr: Array[0..CAP-1] of Integer): Integer;
 var i: Integer;
 begin
-  i := 0;
-  find_max := arr[i];
+  find_max := arr[0];
 
-  while i &lt;= LAST_INDEX do
-  begin
-    find_max := max(find_max, arr[i]);
-
-    i := i + 1
-  end
+  for i := 1 to CAP - 1 do
+    find_max := max(find_max, arr[i])
 end;
 
 var
-  arr: Array[0..LAST_INDEX] of Integer;
+  arr: Array[0..CAP-1] of Integer;
 
 begin
   arr[0] := 0;

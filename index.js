@@ -78,6 +78,26 @@
     }
   }
 
+  class ForStatementNode {
+    constructor(assignment, limit, statement) {
+      this.assignment = assignment;
+      this.limit = limit;
+      this.statement = statement;
+    }
+
+    simulate(ctx) {
+      const variable = this.assignment.variable.name;
+      const limit = this.limit.simulate(ctx);
+
+      this.assignment.simulate(ctx);
+
+      while(ctx[variable] <= limit) {
+        this.statement.simulate(ctx);
+        ctx[variable]++;
+      }
+    }
+  }
+
   class WritelnStatementNode {
     constructor(expression) {
       this.expression = expression;
@@ -667,7 +687,8 @@
         return this.ifStatement();
       } else if(token.type === "while") {
         return this.whileStatement();
-      // TODO: for loops
+      } else if(token.type === "for") {
+        return this.forStatement();
       } else if(token.type === "writeln") {
         return this.writelnStatement();
       } else {
@@ -713,6 +734,26 @@
       const statement = this.statement();
 
       return new WhileStatementNode(condition, statement);
+    }
+
+    forStatement() {
+      const token = this.lexer.consume("for");
+      const assignment = this.assignmentStatement();
+      this.lexer.consume("to");
+      const limit = this.expression();
+
+      if(assignment.variable.type !== "Integer") {
+        throw(`for variable must be integer at line ${token.line}, col ${token.col}`);
+      }
+
+      if(limit.type !== "Integer") {
+        throw(`for limit must be integer at line ${token.line}, col ${token.col}`);
+      }
+
+      this.lexer.consume("do");
+      const statement = this.statement();
+
+      return new ForStatementNode(assignment, limit, statement);
     }
 
     writelnStatement() {
@@ -987,7 +1028,7 @@
     }
   }
 
-  const KEYWORDS = ["program", "begin", "end", "const", "var", "of", "if", "then", "else", "while", "do", "and", "or", "not", "true", "false", "mod", "div", "writeln", "function"];
+  const KEYWORDS = ["program", "begin", "end", "const", "var", "of", "if", "then", "else", "while", "for", "to", "do", "and", "or", "not", "true", "false", "mod", "div", "writeln", "function"];
   const TYPES = ["Integer", "Boolean", "Array"];
 
   class Lexer {
