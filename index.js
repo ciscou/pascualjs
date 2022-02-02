@@ -1216,7 +1216,10 @@
     }
 
     nextToken() {
-      this.skipWhitespace();
+      let skipped = true;
+      while(skipped) {
+        skipped = this.skipWhitespace() || this.skipComments();
+      }
 
       const token = { line: this.line, col: this.col, val: "" };
 
@@ -1341,7 +1344,11 @@
     }
 
     skipWhitespace() {
+      let skipped = false;
+
       while(this.offset < this.input.length && this.isWhitespace(this.input[this.offset])) {
+        skipped = true;
+
         if(this.input[this.offset] === "\n") {
           this.line++;
           this.col = 1;
@@ -1351,6 +1358,24 @@
 
         this.offset++;
       }
+
+      return skipped;
+    }
+
+    skipComments() {
+      let skipped = false;
+
+      if(this.input[this.offset] === "{") {
+        skipped = true
+
+        while(this.offset < this.input.length && this.input[this.offset] !== "}") {
+          this.offset++;
+        }
+
+        this.offset++;
+      }
+
+      return skipped;
     }
 
     isWhitespace(char) {
