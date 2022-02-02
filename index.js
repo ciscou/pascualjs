@@ -466,15 +466,7 @@
       return new ProgramNode(id.val, constsDeclarations, varsDeclarations, statement);
     }
 
-    functionDeclaration() {
-      this.lexer.consume("function");
-      const id = this.lexer.consume("ID");
-      this.lexer.consume("LEFT_PAREN");
-
-      this.symTable = { "$parent$": this.symTable };
-      this.context = { ...this.context, "$parent$": this.context };
-
-      // TODO: by-var vs by-ref params
+    params() {
       const params = [];
 
       while(true) {
@@ -498,6 +490,20 @@
           break;
         }
       }
+
+      return params;
+    }
+
+    functionDeclaration() {
+      this.lexer.consume("function");
+      const id = this.lexer.consume("ID");
+      this.lexer.consume("LEFT_PAREN");
+
+      this.symTable = { "$parent$": this.symTable };
+      this.context = { ...this.context, "$parent$": this.context };
+
+      // TODO: by-var vs by-ref params
+      const params = this.params();
 
       this.lexer.consume("RIGHT_PAREN");
       this.lexer.consume("COLON");
@@ -543,29 +549,7 @@
       this.context = { ...this.context, "$parent$": this.context };
 
       // TODO: by-var vs by-ref params
-      const params = [];
-
-      while(true) {
-        const token = this.lexer.peek();
-
-        if(token.type === "SEMICOLON") {
-          this.lexer.consume("SEMICOLON");
-          continue;
-        }
-
-        if(token.type === "ID") {
-          const { varNames, type, typeSpecs } = this.varDeclaration();
-
-          varNames.forEach(varName => {
-            if(this.symTable[varName.val]) throw(`Variable ${varName.val} already exists! At line ${varName.line}, col ${varName.col}`);
-
-            this.symTable[varName.val] = { name: varName.val, type: type.val, typeSpecs: typeSpecs };
-            params.push({ name: varName.val, type: type.val, typeSpecs: typeSpecs });
-          });
-        } else {
-          break;
-        }
-      }
+      const params = this.params();
 
       this.lexer.consume("RIGHT_PAREN");
 
