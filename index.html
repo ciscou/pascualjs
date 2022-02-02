@@ -20,19 +20,14 @@ end;
 
 const
   N_COINS: Integer = 4;
+  COINS: Array[0..N_COINS-1] of Integer = (1, 4, 7, 11);
   TARGET: Integer = 123;
 
 var
-  coins: Array[0..N_COINS-1] of Integer;
   dp: Array[0..TARGET] of Integer;
   coin, amount, rest: Integer;
 
 begin
-  coins[0] := 1;
-  coins[1] := 4;
-  coins[2] := 7;
-  coins[3] := 11;
-
   for amount := 0 to TARGET do
     dp[amount] := 999999;
 
@@ -42,7 +37,7 @@ begin
   begin
     for coin := 0 to N_COINS-1 do
     begin
-      rest := amount - coins[coin];
+      rest := amount - COINS[coin];
       if rest &gt;= 0 then
         dp[amount] := min(dp[amount], 1 + dp[rest])
       else

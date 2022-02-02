@@ -580,9 +580,36 @@
 
       this.lexer.consume("EQ");
 
-      const value = this.expression().simulate(this.context);
+      let value;
 
-      // TODO: check constant type and expression type match
+      if(type.val === "Integer" || type.val === "Boolean") {
+        const expression = this.expression();
+        if(expression.type !== type.val) {
+          throw(`Type mismatch, expected ${type.val}, got ${expression.type} at line ${type.line}, col ${type.col}`)
+        }
+        value = expression.simulate(this.context);
+      } else if(type.val === "Array") {
+        value = [];
+
+        this.lexer.consume("LEFT_PAREN");
+        while(true) {
+          const rp = this.lexer.peek();
+          if(rp.type === "RIGHT_PAREN") break;
+          if(rp.type === "COMMA") this.lexer.consume("COMMA");
+
+          const expression = this.expression();
+          if(expression.type !== typeSpecs.itemType) {
+            throw(`Type mismatch, expected ${typeSpecs.itemType}, got ${expression.type} at line ${type.line}, col ${type.col}`)
+          }
+
+          value.push(expression.simulate(this.context));
+        }
+        this.lexer.consume("RIGHT_PAREN");
+
+        // TODO check Array size
+      } else {
+         throw(`Cannot build constant of type ${type.val} at line ${type.line}, col ${type.col}`)
+      }
 
       return { constNames: constNames, type: type, typeSpecs: typeSpecs, value: value };
     }
