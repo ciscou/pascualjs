@@ -600,10 +600,8 @@
           value = [];
 
           this.lexer.consume("LEFT_PAREN");
-          while(true) {
-            const rp = this.lexer.peek();
-            if(rp.type === "RIGHT_PAREN") break;
-            if(rp.type === "COMMA") this.lexer.consume("COMMA");
+          for(let i=typeSpecs.low; i<=typeSpecs.high; i++) {
+            if(i > typeSpecs.low) this.lexer.consume("COMMA");
 
             const expression = this.expression();
             if(expression.type !== typeSpecs.itemType) {
@@ -613,8 +611,6 @@
             value.push(expression.simulate(this.context));
           }
           this.lexer.consume("RIGHT_PAREN");
-
-          // TODO check Array size
         } else {
            throw(`Cannot build constant of type ${type.val} at line ${type.line}, col ${type.col}`)
         }
