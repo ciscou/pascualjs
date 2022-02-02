@@ -456,10 +456,16 @@
       this.symTable = { "$parent$": this.symTable };
       this.context = { ...this.context, "$parent$": this.context };
 
+      // TODO by-var vs by-ref params
       const params = [];
 
       while(true) {
         const token = this.lexer.peek();
+
+        if(token.type === "SEMICOLON") {
+          this.lexer.consume("SEMICOLON");
+          continue;
+        }
 
         if(token.type === "ID") {
           const { varNames, type, typeSpecs } = this.varDeclaration();
