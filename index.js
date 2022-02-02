@@ -549,7 +549,10 @@
         this.lexer.consume("of");
         const itemType = this.lexer.consume("TYPE");
 
-        // TODO: check low and high are integers
+        if(low.type !== "Integer" || high.type !== "Integer") {
+          throw(`Array bounds should be of type Integer at line ${this.lexer.line}, col ${this.lexer.col}`);
+        }
+
         typeSpecs.low = low.simulate(this.context);
         typeSpecs.high = high.simulate(this.context);
         typeSpecs.itemType = itemType.val;
@@ -624,7 +627,10 @@
         this.lexer.consume("of");
         const itemType = this.lexer.consume("TYPE");
 
-        // TODO: check low and high are integers
+        if(low.type !== "Integer" || high.type !== "Integer") {
+          throw(`Array bounds should be of type Integer at line ${this.lexer.line}, col ${this.lexer.col}`);
+        }
+
         typeSpecs.low = low.simulate(this.context);
         typeSpecs.high = high.simulate(this.context);
         typeSpecs.itemType = itemType.val;
