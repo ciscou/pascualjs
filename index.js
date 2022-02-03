@@ -1304,7 +1304,7 @@
           this.offset++;
           token.type = "STRING_LITERAL";
         } else {
-          throw(`Missing " at line ${this.line}, col ${this.col}`);
+          throw(`Missing "'" at line ${this.line}, col ${this.col}`);
         }
       } else {
         throw(`Unknown token ${this.input[this.offset]} at line ${this.line}, col ${this.col}`);
