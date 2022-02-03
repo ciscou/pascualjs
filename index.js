@@ -29,10 +29,12 @@
   }
 
   class ProgramNode {
-    constructor(name, constsDeclarations, varsDeclarations, statement) {
+    constructor(name, constsDeclarations, varsDeclarations, funsDeclarations, procsDeclarations, statement) {
       this.name = name;
       this.constsDeclarations = constsDeclarations;
       this.varsDeclarations = varsDeclarations;
+      this.funsDeclarations = funsDeclarations;
+      this.procsDeclarations = procsDeclarations;
       this.statement = statement;
     }
 
@@ -45,7 +47,25 @@
     emitJS() {
       let js = [];
 
-      Object.keys(this.varsDeclarations).forEach(v => js.push(`let ${v};`));
+      js.push(`// ${this.name}`);
+
+      Object.entries(this.funsDeclarations).forEach(([name, fd]) => {
+        js.push(`const ${fd.name} = (${fd.params.map(p => p.name).join(", ")}) => {`);
+        js.push("  let $res$;");
+        fd.statement.emitJS().forEach(ls => js = js.concat(ls.map(l => `  ${l}`)));
+        js.push("  return $res$;");
+        js.push("}");
+      });
+
+      Object.entries(this.procsDeclarations).forEach(([name, pd]) => {
+        js.push(`const ${pd.name} = (${pd.params.map(p => p.name).join(", ")}) => {`);
+        pd.statement.emitJS().forEach(ls => js = js.concat(ls.map(l => `  ${l}`)));
+        js.push("}");
+      });
+
+      Object.entries(this.constsDeclarations).forEach(([name, vd]) => js.push(`const ${name} = ${initializeVariable(vd)};`));
+      Object.entries(this.varsDeclarations).forEach(([name, vd]) => js.push(`let ${name} = ${initializeVariable(vd)};`));
+
       this.statement.emitJS().forEach(ls => js = js.concat(ls));
 
       return js;
@@ -79,6 +99,18 @@
       } else {
         this.elseStatement.simulate(ctx);
       }
+    }
+
+    emitJS() {
+      let js = [];
+
+      js.push(`if(${this.condition.emitJS()}) {`)
+      this.ifStatement.emitJS().forEach(l => js = js.concat(`  ${l}`));
+      js.push("} else {")
+      this.elseStatement.emitJS().forEach(l => js = js.concat(`  ${l}`));
+      js.push("}")
+
+      return js;
     }
   }
 
@@ -197,6 +229,10 @@
       Object.entries(this.fun.varsDeclarations).forEach(([name, vd]) => ctx2[name] = initializeVariable(vd))
       this.fun.statement.simulate(ctx2);
       return ctx2["$res$"];
+    }
+
+    emitJS() {
+      return [`${this.fun.name}(${this.args.map(p => p.emitJS()).join(", ")})`];
     }
   }
 
@@ -400,6 +436,10 @@
     simulate(ctx) {
       return this.a.simulate(ctx) === this.b.simulate(ctx);
     }
+
+    emitJS() {
+      return `${this.a.emitJS()} === ${this.b.emitJS()}`;
+    }
   }
 
   class LtNode {
@@ -414,7 +454,7 @@
     }
 
     emitJS() {
-      return `(${this.a.emitJS()}) < (${this.b.emitJS()})`
+      return `${this.a.emitJS()} < ${this.b.emitJS()}`;
     }
   }
 
@@ -428,6 +468,10 @@
     simulate(ctx) {
       return this.a.simulate(ctx) > this.b.simulate(ctx);
     }
+
+    emitJS() {
+      return `${this.a.emitJS()} > ${this.b.emitJS()}`;
+    }
   }
 
   class LteNode {
@@ -439,6 +483,10 @@
 
     simulate(ctx) {
       return this.a.simulate(ctx) <= this.b.simulate(ctx);
+    }
+
+    emitJS() {
+      return `${this.a.emitJS()} <= ${this.b.emitJS()}`;
     }
   }
 
@@ -452,6 +500,10 @@
     simulate(ctx) {
       return this.a.simulate(ctx) >= this.b.simulate(ctx);
     }
+
+    emitJS() {
+      return `${this.a.emitJS()} >= ${this.b.emitJS()}`;
+    }
   }
 
   class BooleanLiteralNode {
@@ -462,6 +514,10 @@
 
     simulate(ctx) {
       return this.boolean;
+    }
+
+    emitJS() {
+      return this.boolean ? "true" : "false";
     }
   }
 
@@ -533,19 +589,23 @@
 
       let varsDeclarations = {};
       let constsDeclarations = {};
+      let funsDeclarations = {};
+      let procsDeclarations = {};
 
       while(true) {
         const token = this.lexer.peek();
 
         // TODO: types (strings, structs, pointers, custom types)
         if(token.type === "var") {
-          varsDeclarations = this.varsDeclarations();
+          varsDeclarations = this.varsDeclarations(); // TODO: what if there is more than one `var` block?
         } else if(token.type === "const") {
           constsDeclarations = this.constsDeclarations();
         } else if(token.type === "function") {
-          this.functionDeclaration();
+          const fun = this.functionDeclaration();
+          funsDeclarations[fun.name] = fun;
         } else if(token.type === "procedure") {
-          this.procedureDeclaration();
+          const proc = this.procedureDeclaration();
+          procsDeclarations[proc.name] = proc;
         } else {
           break
         }
@@ -555,7 +615,7 @@
       this.lexer.consume("DOT");
       this.lexer.consume("EOF");
 
-      return new ProgramNode(id.val, constsDeclarations, varsDeclarations, statement);
+      return new ProgramNode(id.val, constsDeclarations, varsDeclarations, funsDeclarations, procsDeclarations, statement);
     }
 
     params() {
@@ -630,6 +690,8 @@
 
       this.symTable = this.symTable["$parent$"];
       this.context = this.context["$parent$"];
+
+      return this.symTable[id.val];
     }
 
     procedureDeclaration() {
@@ -671,6 +733,8 @@
 
       this.symTable = this.symTable["$parent$"];
       this.context = this.context["$parent$"];
+
+      return this.symTable[id.val];
     }
 
     typeSpecs(type) {
