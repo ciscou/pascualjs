@@ -15,6 +15,8 @@
   const initializeVariable = (vd) => {
     if(vd.type === "Integer") {
       return 0;
+    } else if(vd.type === "Real") {
+      return 0;
     } else if(vd.type === "Boolean") {
       return false;
     } else if(vd.type === "Array") {
@@ -190,11 +192,11 @@
     }
   }
 
-  class IntegerAddNode {
+  class AddNode {
     constructor(a, b) {
       this.a = a;
       this.b = b;
-      this.type = "Integer";
+      this.type = a.type;
     }
 
     simulate(ctx) {
@@ -202,11 +204,11 @@
     }
   }
 
-  class IntegerSubNode {
+  class SubNode {
     constructor(a, b) {
       this.a = a;
       this.b = b;
-      this.type = "Integer";
+      this.type = a.type;
     }
 
     simulate(ctx) {
@@ -214,11 +216,11 @@
     }
   }
 
-  class IntegerMulNode {
+  class MulNode {
     constructor(a, b) {
       this.a = a;
       this.b = b;
-      this.type = "Integer";
+      this.type = a.type;
     }
 
     simulate(ctx) {
@@ -272,6 +274,17 @@
     }
   }
 
+  class RealLiteralNode {
+    constructor(real) {
+      this.real = real
+      this.type = "Real";
+    }
+
+    simulate(ctx) {
+      return this.real;
+    }
+  }
+
   class IntegerUnaryAddNode {
     constructor(expression) {
       this.expression = expression
@@ -294,7 +307,7 @@
     }
   }
 
-  class RealDivNode {
+  class DivNode {
     constructor(a, b) {
       this.a = a;
       this.b = b;
@@ -938,6 +951,24 @@
       return res;
     }
 
+    coerce(token, left, right) {
+      let type = "Integer";
+
+      if(left.type === "Real") {
+        type = "Real"
+      } else if(left.type !== "Integer") {
+        throw(`Incompatible types for ${token.val} ${left.type} and ${right.type} at line ${token.line}, col ${token.col}`);
+      }
+
+      if(right.type === "Real") {
+        type = "Real"
+      } else if(right.type !== "Integer") {
+        throw(`Incompatible types for ${token.val} ${left.type} and ${right.type} at line ${token.line}, col ${token.col}`);
+      }
+
+      left.type = type;
+    }
+
     expression() {
       let left = this.factor();
 
@@ -947,17 +978,13 @@
         if(token.type === "ADD") {
           this.lexer.consume("ADD");
           const right = this.factor();
-          if(left.type !== "Integer" || right.type !== "Integer") {
-            throw(`Incompatible types for addition ${left.type} and ${right.type} at line ${token.line}, col ${token.col}`);
-          }
-          left = new IntegerAddNode(left, right);
+          this.coerce(token, left, right);
+          left = new AddNode(left, right);
         } else if(token.type === "SUB") {
           this.lexer.consume("SUB");
           const right = this.factor();
-          if(left.type !== "Integer" || right.type !== "Integer") {
-            throw(`Incompatible types for substraction ${left.type} and ${right.type} at line ${token.line}, col ${token.col}`);
-          }
-          left = new IntegerSubNode(left, right);
+          this.coerce(token, left, right);
+          left = new SubNode(left, right);
         } else if(token.type === "EQ") {
           this.lexer.consume("EQ");
           const right = this.factor();
@@ -1010,22 +1037,18 @@
         if(token.type === "MUL") {
           this.lexer.consume("MUL");
           const right = this.term();
-          if(left.type !== "Integer" || right.type !== "Integer") {
-            throw(`Incompatible types for multiplication ${left.type} and ${right.type} at line ${token.line}, col ${token.col}`);
-          }
-          left = new IntegerMulNode(left, right);
+          this.coerce(token, left, right);
+          left = new MulNode(left, right);
         } else if(token.type === "DIV") {
           this.lexer.consume("DIV");
           const right = this.term();
-          if(left.type !== "Integer" || right.type !== "Integer") {
-            throw(`Incompatible types for division ${left.type} and ${right.type} at line ${token.line}, col ${token.col}`);
-          }
-          left = new RealDivNode(left, right);
+          this.coerce(token, left, right);
+          left = new DivNode(left, right);
         } else if(token.type === "div") {
           this.lexer.consume("div");
           const right = this.term();
           if(left.type !== "Integer" || right.type !== "Integer") {
-            throw(`Incompatible types for division ${left.type} and ${right.type} at line ${token.line}, col ${token.col}`);
+            throw(`Incompatible types for div ${left.type} and ${right.type} at line ${token.line}, col ${token.col}`);
           }
           left = new IntegerDivNode(left, right);
         } else if(token.type === "mod") {
@@ -1062,6 +1085,8 @@
 
       if(token.type === "INTEGER_LITERAL") {
         return new IntegerLiteralNode(parseInt(token.val));
+      } else if(token.type === "REAL_LITERAL") {
+        return new RealLiteralNode(parseFloat(token.val));
       } else if(token.type === "STRING_LITERAL") {
         return new StringLiteralNode(token.val);
       } else if(token.type === "ADD") {
@@ -1154,7 +1179,7 @@
   }
 
   const KEYWORDS = ["program", "begin", "end", "const", "var", "of", "if", "then", "else", "while", "for", "to", "do", "and", "or", "not", "true", "false", "mod", "div", "writeln", "function", "procedure"];
-  const TYPES = ["Integer", "Boolean", "Array"];
+  const TYPES = ["Integer", "Real", "Boolean", "Array"];
 
   class Lexer {
     constructor(input) {
@@ -1217,7 +1242,17 @@
           token.val += this.input[this.offset];
           this.offset++;
         }
-        token.type = "INTEGER_LITERAL";
+        if(this.offset < this.input.length && this.input[this.offset] === ".") {
+          token.val += this.input[this.offset];
+          this.offset++;
+          while(this.offset < this.input.length && this.input[this.offset].match(/[0-9]/)) {
+            token.val += this.input[this.offset];
+            this.offset++;
+          }
+          token.type = "REAL_LITERAL";
+        } else {
+          token.type = "INTEGER_LITERAL";
+        }
       } else if(this.offset + 1 < this.input.length && this.input[this.offset] === ":" && this.input[this.offset + 1] === "=") {
         token.val = ":=";
         this.offset += 2;
