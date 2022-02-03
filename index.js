@@ -253,13 +253,13 @@
   }
 
   class StringLiteralNode {
-    constructor(integer) {
-      this.integer = integer
+    constructor(string) {
+      this.string = string
       this.type = "String";
     }
 
     simulate(ctx) {
-      return this.integer;
+      return this.string;
     }
   }
 
