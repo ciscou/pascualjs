@@ -8,18 +8,56 @@
   <body>
     <body>
       <form id="form">
-        <textarea name="code" id="code" rows="16" cols="60">program recursive_fib;
+        <textarea name="code" id="code" rows="16" cols="60">program coin_change;
 
-function fib(n: Integer): Integer;
+function min(a, b: Integer): Integer;
 begin
-  if n &lt;= 2 then
-    fib := 1
+  if a &lt; b then
+    min := a
   else
-    fib := fib(n-1) + fib(n-2)
+    min := b
 end;
 
+var
+  coins: Array[0..4] of Integer;
+  dp: Array[0..123] of Integer;
+  coin, amount, rest: Integer;
+  target: Integer;
+
 begin
-  writeln(fib(10))
+  target := 123;
+
+  coins[0] := 1;
+  coins[1] := 4;
+  coins[2] := 7;
+  coins[3] := 11;
+
+  amount := 0;
+  while amount &lt;= target do
+  begin
+    dp[amount] := 999999;
+    amount := amount + 1
+  end;
+
+  dp[0] := 0;
+
+  amount := 1;
+  while amount &lt;= target do
+  begin
+    coin := 0;
+    while coin &lt; 4 do
+    begin
+      rest := amount - coins[coin];
+      if rest &gt;= 0 then
+        dp[amount] := min(dp[amount], 1 + dp[rest]);
+
+      coin := coin + 1
+    end;
+
+    amount := amount + 1
+  end;
+
+  writeln(dp[target])
 end.</textarea>
         <input type="submit" name="Submit" id="submit" value="submit" />
       </form>
