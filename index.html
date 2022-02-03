@@ -8,26 +8,56 @@
   <body>
     <body>
       <form id="form">
-        <textarea name="code" id="code" rows="16" cols="60">program pi;
+        <textarea name="code" id="code" rows="16" cols="60">program coin_change;
+
+function min(a, b: Integer): Integer;
+begin
+  if a &lt; b then
+    min := a
+  else
+    min := b
+end;
 
 var
-  pi: Real;
-  i, sign: Integer;
+  coins: Array[0..4] of Integer;
+  dp: Array[0..123] of Integer;
+  coin, amount, rest: Integer;
+  target: Integer;
 
 begin
-  pi := 3.0;
-  i := 2;
-  sign := 1;
+  target := 123;
 
-  while i &lt; 2000 do
+  coins[0] := 1;
+  coins[1] := 4;
+  coins[2] := 7;
+  coins[3] := 11;
+
+  amount := 0;
+  while amount &lt;= target do
   begin
-    pi := pi + sign * 4 / (i * (i + 1) * (i + 2));
-
-    i := i + 2;
-    sign := -sign
+    dp[amount] := 999999;
+    amount := amount + 1
   end;
 
-  writeln(pi)
+  dp[0] := 0;
+
+  amount := 1;
+  while amount &lt;= target do
+  begin
+    coin := 0;
+    while coin &lt; 4 do
+    begin
+      rest := amount - coins[coin];
+      if rest &gt;= 0 then
+        dp[amount] := min(dp[amount], 1 + dp[rest]);
+
+      coin := coin + 1
+    end;
+
+    amount := amount + 1
+  end;
+
+  writeln(dp[target])
 end.</textarea>
         <input type="submit" name="Submit" id="submit" value="submit" />
       </form>

@@ -10,6 +10,8 @@
     console.log(ast);
 
     ast.simulate({});
+
+    console.log(ast.emitJS().join("\n"));
   });
 
   const initializeVariable = (vd) => {
@@ -27,10 +29,12 @@
   }
 
   class ProgramNode {
-    constructor(name, constsDeclarations, varsDeclarations, statement) {
+    constructor(name, constsDeclarations, varsDeclarations, funsDeclarations, procsDeclarations, statement) {
       this.name = name;
       this.constsDeclarations = constsDeclarations;
       this.varsDeclarations = varsDeclarations;
+      this.funsDeclarations = funsDeclarations;
+      this.procsDeclarations = procsDeclarations;
       this.statement = statement;
     }
 
@@ -38,6 +42,33 @@
       Object.entries(this.constsDeclarations).forEach(([name, vd]) => ctx[name] = vd.value);
       Object.entries(this.varsDeclarations).forEach(([name, vd]) => ctx[name] = initializeVariable(vd));
       this.statement.simulate(ctx);
+    }
+
+    emitJS() {
+      let js = [];
+
+      js.push(`// ${this.name}`);
+
+      Object.entries(this.funsDeclarations).forEach(([name, fd]) => {
+        js.push(`const ${fd.name} = (${fd.params.map(p => p.name).join(", ")}) => {`);
+        js.push("  let $res$;");
+        fd.statement.emitJS().forEach(ls => js = js.concat(ls.map(l => `  ${l}`)));
+        js.push("  return $res$;");
+        js.push("}");
+      });
+
+      Object.entries(this.procsDeclarations).forEach(([name, pd]) => {
+        js.push(`const ${pd.name} = (${pd.params.map(p => p.name).join(", ")}) => {`);
+        pd.statement.emitJS().forEach(ls => js = js.concat(ls.map(l => `  ${l}`)));
+        js.push("}");
+      });
+
+      Object.entries(this.constsDeclarations).forEach(([name, vd]) => js.push(`const ${name} = ${JSON.stringify(initializeVariable(vd))};`));
+      Object.entries(this.varsDeclarations).forEach(([name, vd]) => js.push(`let ${name} = ${JSON.stringify(initializeVariable(vd))};`));
+
+      this.statement.emitJS().forEach(ls => js = js.concat(ls));
+
+      return js;
     }
   }
 
@@ -48,6 +79,10 @@
 
     simulate(ctx) {
       this.statements.forEach(statement => statement.simulate(ctx));
+    }
+
+    emitJS() {
+      return this.statements.map(s => s.emitJS());
     }
   }
 
@@ -65,6 +100,18 @@
         this.elseStatement.simulate(ctx);
       }
     }
+
+    emitJS() {
+      let js = [];
+
+      js.push(`if(${this.condition.emitJS()}) {`)
+      this.ifStatement.emitJS().forEach(l => js = js.concat(`  ${l}`));
+      js.push("} else {")
+      this.elseStatement.emitJS().forEach(l => js = js.concat(`  ${l}`));
+      js.push("}")
+
+      return js;
+    }
   }
 
   class WhileStatementNode {
@@ -77,6 +124,14 @@
       while(this.condition.simulate(ctx)) {
         this.statement.simulate(ctx);
       }
+    }
+
+    emitJS() {
+      let js = [];
+      js.push(`while(${this.condition.emitJS()}) {`);
+      this.statement.emitJS().forEach(ls => js = js.concat(ls.map(l => `  ${l}`)));
+      js.push("}");
+      return js;
     }
   }
 
@@ -109,6 +164,10 @@
       const message = this.expressions.map(expression => expression.simulate(ctx));
       console.log(message.join(""));
     }
+
+    emitJS() {
+      return [`console.log(${this.expressions.map(e => e.emitJS()).join(", ")});`]
+    }
   }
 
   class AssignmentStatementNode {
@@ -119,6 +178,10 @@
 
     simulate(ctx) {
       ctx[this.variable.name] = this.expression.simulate(ctx);
+    }
+
+    emitJS() {
+      return [`${this.variable.name} = ${this.expression.emitJS()};`]
     }
   }
 
@@ -134,6 +197,10 @@
       const index = this.index.simulate(ctx) - this.ary.typeSpecs.low;
       return ctx[this.ary.name][index];
     }
+
+    emitJS() {
+      return `${this.ary.name}[${this.index.emitJS()}]`
+    }
   }
 
   class ArrayWriteNode {
@@ -147,6 +214,10 @@
       // TODO: bounds checks
       const index = this.index.simulate(ctx) - this.ary.typeSpecs.low;
       ctx[this.ary.name][index] = this.expression.simulate(ctx);
+    }
+
+    emitJS() {
+      return [`${this.ary.name}[${this.index.emitJS()}] = ${this.expression.emitJS()};`]
     }
   }
 
@@ -166,6 +237,10 @@
       Object.entries(this.fun.varsDeclarations).forEach(([name, vd]) => ctx2[name] = initializeVariable(vd))
       this.fun.statement.simulate(ctx2);
       return ctx2["$res$"];
+    }
+
+    emitJS() {
+      return [`${this.fun.name}(${this.args.map(p => p.emitJS()).join(", ")})`];
     }
   }
 
@@ -190,6 +265,10 @@
     simulate(ctx) {
       // well... no-op. surprise!
     }
+
+    emitJS() {
+      return [];
+    }
   }
 
   class AddNode {
@@ -201,6 +280,10 @@
 
     simulate(ctx) {
       return this.a.simulate(ctx) + this.b.simulate(ctx);
+    }
+
+    emitJS() {
+      return [`(${this.a.emitJS()}) + (${this.b.emitJS()})`];
     }
   }
 
@@ -214,6 +297,10 @@
     simulate(ctx) {
       return this.a.simulate(ctx) - this.b.simulate(ctx);
     }
+
+    emitJS() {
+      return [`(${this.a.emitJS()}) - (${this.b.emitJS()})`];
+    }
   }
 
   class MulNode {
@@ -226,6 +313,10 @@
     simulate(ctx) {
       return this.a.simulate(ctx) * this.b.simulate(ctx);
     }
+
+    emitJS() {
+      return [`(${this.a.emitJS()}) * (${this.b.emitJS()})`];
+    }
   }
 
   class IntegerDivNode {
@@ -237,6 +328,10 @@
 
     simulate(ctx) {
       return Math.floor(this.a.simulate(ctx) / this.b.simulate(ctx));
+    }
+
+    emitJS() {
+      return [`Math.floor((${this.a.emitJS()}) / (${this.b.emitJS()}))`];
     }
   }
 
@@ -261,6 +356,10 @@
     simulate(ctx) {
       return this.string;
     }
+
+    emitJS() {
+      return `"${this.string}"`
+    }
   }
 
   class IntegerLiteralNode {
@@ -271,6 +370,10 @@
 
     simulate(ctx) {
       return this.integer;
+    }
+
+    emitJS() {
+      return `${this.integer}`
     }
   }
 
@@ -283,6 +386,10 @@
     simulate(ctx) {
       return this.real;
     }
+
+    emitJS() {
+      return `${this.real}`
+    }
   }
 
   class IntegerUnaryAddNode {
@@ -294,6 +401,10 @@
     simulate(ctx) {
       return this.expression.simulate(ctx);
     }
+
+    emitJS() {
+      return this.expression.emitJS();
+    }
   }
 
   class IntegerUnarySubNode {
@@ -304,6 +415,10 @@
 
     simulate(ctx) {
       return -this.expression.simulate(ctx);
+    }
+
+    emitJS() {
+      return `-(${this.expression.emitJS()})`;
     }
   }
 
@@ -317,6 +432,10 @@
     simulate(ctx) {
       return this.a.simulate(ctx) / this.b.simulate(ctx);
     }
+
+    emitJS() {
+      return [`(${this.a.emitJS()}) / (${this.b.emitJS()})`];
+    }
   }
 
   class EqNode {
@@ -328,6 +447,10 @@
 
     simulate(ctx) {
       return this.a.simulate(ctx) === this.b.simulate(ctx);
+    }
+
+    emitJS() {
+      return `${this.a.emitJS()} === ${this.b.emitJS()}`;
     }
   }
 
@@ -341,6 +464,10 @@
     simulate(ctx) {
       return this.a.simulate(ctx) < this.b.simulate(ctx);
     }
+
+    emitJS() {
+      return `${this.a.emitJS()} < ${this.b.emitJS()}`;
+    }
   }
 
   class GtNode {
@@ -352,6 +479,10 @@
 
     simulate(ctx) {
       return this.a.simulate(ctx) > this.b.simulate(ctx);
+    }
+
+    emitJS() {
+      return `${this.a.emitJS()} > ${this.b.emitJS()}`;
     }
   }
 
@@ -365,6 +496,10 @@
     simulate(ctx) {
       return this.a.simulate(ctx) <= this.b.simulate(ctx);
     }
+
+    emitJS() {
+      return `${this.a.emitJS()} <= ${this.b.emitJS()}`;
+    }
   }
 
   class GteNode {
@@ -377,6 +512,10 @@
     simulate(ctx) {
       return this.a.simulate(ctx) >= this.b.simulate(ctx);
     }
+
+    emitJS() {
+      return `${this.a.emitJS()} >= ${this.b.emitJS()}`;
+    }
   }
 
   class BooleanLiteralNode {
@@ -387,6 +526,10 @@
 
     simulate(ctx) {
       return this.boolean;
+    }
+
+    emitJS() {
+      return this.boolean ? "true" : "false";
     }
   }
 
@@ -438,6 +581,10 @@
     simulate(ctx) {
       return ctx[this.variable.name];
     }
+
+    emitJS() {
+      return this.variable.name;
+    }
   }
 
   class Parser {
@@ -454,19 +601,23 @@
 
       let varsDeclarations = {};
       let constsDeclarations = {};
+      let funsDeclarations = {};
+      let procsDeclarations = {};
 
       while(true) {
         const token = this.lexer.peek();
 
         // TODO: types (strings, structs, pointers, custom types)
         if(token.type === "var") {
-          varsDeclarations = this.varsDeclarations();
+          varsDeclarations = this.varsDeclarations(); // TODO: what if there is more than one `var` block?
         } else if(token.type === "const") {
           constsDeclarations = this.constsDeclarations();
         } else if(token.type === "function") {
-          this.functionDeclaration();
+          const fun = this.functionDeclaration();
+          funsDeclarations[fun.name] = fun;
         } else if(token.type === "procedure") {
-          this.procedureDeclaration();
+          const proc = this.procedureDeclaration();
+          procsDeclarations[proc.name] = proc;
         } else {
           break
         }
@@ -476,7 +627,7 @@
       this.lexer.consume("DOT");
       this.lexer.consume("EOF");
 
-      return new ProgramNode(id.val, constsDeclarations, varsDeclarations, statement);
+      return new ProgramNode(id.val, constsDeclarations, varsDeclarations, funsDeclarations, procsDeclarations, statement);
     }
 
     params() {
@@ -551,6 +702,8 @@
 
       this.symTable = this.symTable["$parent$"];
       this.context = this.context["$parent$"];
+
+      return this.symTable[id.val];
     }
 
     procedureDeclaration() {
@@ -592,6 +745,8 @@
 
       this.symTable = this.symTable["$parent$"];
       this.context = this.context["$parent$"];
+
+      return this.symTable[id.val];
     }
 
     typeSpecs(type) {
@@ -1242,7 +1397,7 @@
           token.val += this.input[this.offset];
           this.offset++;
         }
-        if(this.offset < this.input.length && this.input[this.offset] === ".") {
+        if(this.offset < this.input.length && this.input[this.offset] === "." && this.input[this.offset+1] !== ".") {
           token.val += this.input[this.offset];
           this.offset++;
           while(this.offset < this.input.length && this.input[this.offset].match(/[0-9]/)) {
