@@ -63,8 +63,8 @@
         js.push("}");
       });
 
-      Object.entries(this.constsDeclarations).forEach(([name, vd]) => js.push(`const ${name} = ${initializeVariable(vd)};`));
-      Object.entries(this.varsDeclarations).forEach(([name, vd]) => js.push(`let ${name} = ${initializeVariable(vd)};`));
+      Object.entries(this.constsDeclarations).forEach(([name, vd]) => js.push(`const ${name} = ${JSON.stringify(initializeVariable(vd))};`));
+      Object.entries(this.varsDeclarations).forEach(([name, vd]) => js.push(`let ${name} = ${JSON.stringify(initializeVariable(vd))};`));
 
       this.statement.emitJS().forEach(ls => js = js.concat(ls));
 
@@ -197,6 +197,10 @@
       const index = this.index.simulate(ctx) - this.ary.typeSpecs.low;
       return ctx[this.ary.name][index];
     }
+
+    emitJS() {
+      return `${this.ary.name}[${this.index.emitJS()}]`
+    }
   }
 
   class ArrayWriteNode {
@@ -210,6 +214,10 @@
       // TODO: bounds checks
       const index = this.index.simulate(ctx) - this.ary.typeSpecs.low;
       ctx[this.ary.name][index] = this.expression.simulate(ctx);
+    }
+
+    emitJS() {
+      return [`${this.ary.name}[${this.index.emitJS()}] = ${this.expression.emitJS()};`]
     }
   }
 
@@ -256,6 +264,10 @@
   class NoOpNode {
     simulate(ctx) {
       // well... no-op. surprise!
+    }
+
+    emitJS() {
+      return [];
     }
   }
 
@@ -1385,7 +1397,7 @@
           token.val += this.input[this.offset];
           this.offset++;
         }
-        if(this.offset < this.input.length && this.input[this.offset] === ".") {
+        if(this.offset < this.input.length && this.input[this.offset] === "." && this.input[this.offset+1] !== ".") {
           token.val += this.input[this.offset];
           this.offset++;
           while(this.offset < this.input.length && this.input[this.offset].match(/[0-9]/)) {
