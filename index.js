@@ -10,6 +10,8 @@
     console.log(ast);
 
     ast.simulate({});
+
+    console.log(ast.emitJS().join("\n"));
   });
 
   const initializeVariable = (vd) => {
@@ -41,6 +43,15 @@
       Object.entries(this.varsDeclarations).forEach(([name, vd]) => ctx[name] = initializeVariable(vd));
       this.statement.simulate(ctx);
     }
+
+    emitJS() {
+      let js = [];
+
+      Object.keys(this.varsDeclarations).forEach(v => js.push(`let ${v};`));
+      this.statement.emitJS().forEach(ls => js = js.concat(ls));
+
+      return js;
+    }
   }
 
   class StatementsBlockNode {
@@ -50,6 +61,10 @@
 
     simulate(ctx) {
       this.statements.forEach(statement => statement.simulate(ctx));
+    }
+
+    emitJS() {
+      return this.statements.map(s => s.emitJS());
     }
   }
 
@@ -79,6 +94,14 @@
       while(this.condition.simulate(ctx)) {
         this.statement.simulate(ctx);
       }
+    }
+
+    emitJS() {
+      let js = [];
+      js.push(`while(${this.condition.emitJS()}) {`);
+      this.statement.emitJS().forEach(ls => js = js.concat(ls.map(l => `  ${l}`)));
+      js.push("}");
+      return js;
     }
   }
 
@@ -111,6 +134,10 @@
       const message = this.expressions.map(expression => expression.simulate(ctx));
       console.log(message.join(""));
     }
+
+    emitJS() {
+      return [`console.log(${this.expressions.map(e => e.emitJS()).join(", ")});`]
+    }
   }
 
   class AssignmentStatementNode {
@@ -121,6 +148,10 @@
 
     simulate(ctx) {
       ctx[this.variable.name] = this.expression.simulate(ctx);
+    }
+
+    emitJS() {
+      return [`${this.variable.name} = ${this.expression.emitJS()};`]
     }
   }
 
@@ -204,6 +235,10 @@
     simulate(ctx) {
       return this.a.simulate(ctx) + this.b.simulate(ctx);
     }
+
+    emitJS() {
+      return [`(${this.a.emitJS()}) + (${this.b.emitJS()})`];
+    }
   }
 
   class SubNode {
@@ -215,6 +250,10 @@
 
     simulate(ctx) {
       return this.a.simulate(ctx) - this.b.simulate(ctx);
+    }
+
+    emitJS() {
+      return [`(${this.a.emitJS()}) - (${this.b.emitJS()})`];
     }
   }
 
@@ -228,6 +267,10 @@
     simulate(ctx) {
       return this.a.simulate(ctx) * this.b.simulate(ctx);
     }
+
+    emitJS() {
+      return [`(${this.a.emitJS()}) * (${this.b.emitJS()})`];
+    }
   }
 
   class IntegerDivNode {
@@ -239,6 +282,10 @@
 
     simulate(ctx) {
       return Math.floor(this.a.simulate(ctx) / this.b.simulate(ctx));
+    }
+
+    emitJS() {
+      return [`Math.floor((${this.a.emitJS()}) / (${this.b.emitJS()}))`];
     }
   }
 
@@ -263,6 +310,10 @@
     simulate(ctx) {
       return this.string;
     }
+
+    emitJS() {
+      return `"${this.string}"`
+    }
   }
 
   class IntegerLiteralNode {
@@ -273,6 +324,10 @@
 
     simulate(ctx) {
       return this.integer;
+    }
+
+    emitJS() {
+      return `${this.integer}`
     }
   }
 
@@ -285,6 +340,10 @@
     simulate(ctx) {
       return this.real;
     }
+
+    emitJS() {
+      return `${this.real}`
+    }
   }
 
   class IntegerUnaryAddNode {
@@ -295,6 +354,10 @@
 
     simulate(ctx) {
       return this.expression.simulate(ctx);
+    }
+
+    emitJS() {
+      return this.expression.emitJS();
     }
   }
 
@@ -307,6 +370,10 @@
     simulate(ctx) {
       return -this.expression.simulate(ctx);
     }
+
+    emitJS() {
+      return `-(${this.expression.emitJS()})`;
+    }
   }
 
   class DivNode {
@@ -318,6 +385,10 @@
 
     simulate(ctx) {
       return this.a.simulate(ctx) / this.b.simulate(ctx);
+    }
+
+    emitJS() {
+      return [`(${this.a.emitJS()}) / (${this.b.emitJS()})`];
     }
   }
 
@@ -342,6 +413,10 @@
 
     simulate(ctx) {
       return this.a.simulate(ctx) < this.b.simulate(ctx);
+    }
+
+    emitJS() {
+      return `(${this.a.emitJS()}) < (${this.b.emitJS()})`
     }
   }
 
@@ -439,6 +514,10 @@
 
     simulate(ctx) {
       return ctx[this.variable.name];
+    }
+
+    emitJS() {
+      return this.variable.name;
     }
   }
 
