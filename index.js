@@ -1252,7 +1252,7 @@
           token.val += this.input[this.offset];
           this.offset++;
         }
-        if(this.offset < this.input.length && this.input[this.offset] === ".") {
+        if(this.offset < this.input.length && this.input[this.offset] === "." && this.input[this.offset+1] !== ".") {
           token.val += this.input[this.offset];
           this.offset++;
           while(this.offset < this.input.length && this.input[this.offset].match(/[0-9]/)) {
