@@ -27,10 +27,12 @@
   }
 
   class ProgramNode {
-    constructor(name, constsDeclarations, varsDeclarations, statement) {
+    constructor(name, constsDeclarations, varsDeclarations, funsDeclarations, procsDeclarations, statement) {
       this.name = name;
       this.constsDeclarations = constsDeclarations;
       this.varsDeclarations = varsDeclarations;
+      this.funsDeclarations = funsDeclarations;
+      this.procsDeclarations = procsDeclarations;
       this.statement = statement;
     }
 
@@ -454,19 +456,23 @@
 
       let varsDeclarations = {};
       let constsDeclarations = {};
+      let funsDeclarations = {};
+      let procsDeclarations = {};
 
       while(true) {
         const token = this.lexer.peek();
 
         // TODO: types (strings, structs, pointers, custom types)
         if(token.type === "var") {
-          varsDeclarations = this.varsDeclarations();
+          varsDeclarations = this.varsDeclarations(); // TODO: what if there is more than one `var` block?
         } else if(token.type === "const") {
           constsDeclarations = this.constsDeclarations();
         } else if(token.type === "function") {
-          this.functionDeclaration();
+          const fun = this.functionDeclaration();
+          funsDeclarations[fun.name] = fun;
         } else if(token.type === "procedure") {
-          this.procedureDeclaration();
+          const proc = this.procedureDeclaration();
+          procsDeclarations[proc.name] = proc;
         } else {
           break
         }
@@ -476,7 +482,7 @@
       this.lexer.consume("DOT");
       this.lexer.consume("EOF");
 
-      return new ProgramNode(id.val, constsDeclarations, varsDeclarations, statement);
+      return new ProgramNode(id.val, constsDeclarations, varsDeclarations, funsDeclarations, procsDeclarations, statement);
     }
 
     params() {
@@ -551,6 +557,8 @@
 
       this.symTable = this.symTable["$parent$"];
       this.context = this.context["$parent$"];
+
+      return this.symTable[id.val];
     }
 
     procedureDeclaration() {
@@ -592,6 +600,8 @@
 
       this.symTable = this.symTable["$parent$"];
       this.context = this.context["$parent$"];
+
+      return this.symTable[id.val];
     }
 
     typeSpecs(type) {
